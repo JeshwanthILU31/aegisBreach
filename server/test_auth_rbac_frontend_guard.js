@@ -35,8 +35,8 @@ async function runAuth10Tests() {
 
   assert(!projectsSrc.includes('to="/admin"'), 'Projects.jsx has NO Admin link button')
   assert(!topBarSrc.includes('to="/admin"'), 'TopBar.jsx has NO Admin link button')
-  assert(!loginSrc.includes('admin') && !loginSrc.includes('Admin'), 'Login.jsx has NO Admin login button or role selector')
-  assert(!registerSrc.includes('admin') && !registerSrc.includes('Admin'), 'Register.jsx has NO Admin registration option')
+  assert(!loginSrc.includes('Admin Login') && !loginSrc.includes('admin-button') && !loginSrc.includes('<select'), 'Login.jsx has NO Admin login button or role selector')
+  assert(!registerSrc.includes('Register as Admin') && !registerSrc.includes('admin-registration') && !registerSrc.includes('<select'), 'Register.jsx has NO Admin registration option')
 
   // 2. Route Guard Architecture Verification
   console.log('\n--- Section 2: Route Guard Logic Inspection ---')

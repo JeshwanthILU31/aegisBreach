@@ -36,8 +36,13 @@ export default function Login() {
 
     setLoading(true)
     try {
-      await login(identifier.trim(), password)
-      navigate('/projects')
+      const authResult = await login(identifier.trim(), password)
+      const role = authResult?.user?.role
+      if (role === 'admin') {
+        navigate('/admin')
+      } else {
+        navigate('/projects')
+      }
     } catch (err) {
       const serverError = err.response?.data?.error || 'Invalid username/email or password'
       setError(serverError)
@@ -67,11 +72,6 @@ export default function Login() {
           </div>
         )}
 
-        {loginResult && (
-          <div className="auth-alert auth-alert-success" role="status" style={{ display: 'none' }}>
-            Logged in as {loginResult.user?.username} ({loginResult.user?.role})
-          </div>
-        )}
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>
           <label htmlFor="identifier">Username or Email</label>

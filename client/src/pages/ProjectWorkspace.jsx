@@ -1,10 +1,11 @@
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import AppShell from '../components/layout/AppShell'
 import CodingPage from '../components/coding/CodingPage'
 import DocumentsPage from '../components/documents/DocumentsPage'
 import DocumentViewerPlaceholder from '../components/documents/DocumentViewerPlaceholder'
 import ReviewPage from '../components/review/ReviewPage'
-import { getProject } from '../data/projects'
+import * as projectsApi from '../services/projectsApi'
 
 const sectionLabels = {
   documents: 'Documents',
@@ -34,7 +35,32 @@ function WorkspaceOverview({ project }) {
 export default function ProjectWorkspace() {
   const { projectId } = useParams()
   const location = useLocation()
-  const project = getProject(projectId)
+  const [project, setProject] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const fetchProject = useCallback(async () => {
+    if (!projectId) return
+    try {
+      setLoading(true)
+      setError('')
+      const data = await projectsApi.getProject(projectId)
+      if (data && (data._id || data.id)) {
+        setProject(data)
+      } else {
+        setError('Project not found')
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Project not found')
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    fetchProject()
+  }, [fetchProject])
+
   const pathParts = location.pathname.split('/').filter(Boolean)
   const sectionKey = pathParts.at(-1)
   const isDocumentRoute = pathParts.at(-2) === 'documents'
@@ -42,8 +68,20 @@ export default function ProjectWorkspace() {
   const isCodingRoute = pathParts.at(-1) === 'coding' && pathParts.at(-3) === 'documents'
   const sectionLabel = sectionLabels[sectionKey]
 
-  if (!project) {
-    return <div className="not-found-state"><h1>Project not found</h1></div>
+  if (loading) {
+    return (
+      <div className="not-found-state" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+        <h2>Loading workspace...</h2>
+      </div>
+    )
+  }
+
+  if (error || !project) {
+    return (
+      <div className="not-found-state" style={{ padding: '40px', textAlign: 'center' }}>
+        <h1>{error || 'Project not found'}</h1>
+      </div>
+    )
   }
 
   return (

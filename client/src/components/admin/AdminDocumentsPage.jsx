@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import * as documentsApi from '../../services/documentsApi'
 import * as batchesApi from '../../services/batchesApi'
 import * as projectsApi from '../../services/projectsApi'
+import { useAuth } from '../../context/AuthContext'
 
 const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024 // 30 MB
 const ALLOWED_EXTENSIONS = [
@@ -53,9 +54,15 @@ const createEmptyBulkRow = () => ({
 })
 
 export default function AdminDocumentsPage() {
+  const { logout } = useAuth()
   const { projectId, batchId } = useParams()
   const navigate = useNavigate()
   const activeProjectId = projectId || 'project-orchid-6-7'
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
 
   const fileInputRef = useRef(null)
 
@@ -464,6 +471,14 @@ export default function AdminDocumentsPage() {
             <span className="user-avatar" style={{ background: '#7c3aed' }}>AD</span>
             <span>Admin</span>
           </div>
+          <button
+            className="logout-button"
+            type="button"
+            onClick={handleLogout}
+            title="Sign out"
+          >
+            Logout
+          </button>
         </div>
       </header>
 

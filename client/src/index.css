@@ -33,6 +33,13 @@ h2 { color: #27384b; font-size: 14px; font-weight: 600; }
 .top-bar-actions { gap: 22px; }
 .top-bar-environment { color: #778696; font-size: 11px; }
 .user-menu { background: transparent; border: 0; color: #46586b; cursor: pointer; font-size: 12px; gap: 8px; padding: 3px 0; }
+.logout-button { background: transparent; border: 1px solid #cbd5e1; border-radius: 3px; color: #475569; cursor: pointer; font-size: 11px; font-weight: 500; line-height: 1; padding: 4px 9px; transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+.logout-button:hover { background: #f1f5f9; border-color: #94a3b8; color: #0f172a; }
+.selection-header .logout-button { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.2); color: #e2e8f0; }
+.selection-header .logout-button:hover { background: rgba(255, 255, 255, 0.18); border-color: rgba(255, 255, 255, 0.35); color: #fff; }
+.auth-toast-notification { position: fixed; top: 18px; right: 22px; z-index: 9999; background: #1e293b; color: #f8fafc; border: 1px solid #334155; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); border-radius: 4px; padding: 9px 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; animation: toastSlideIn 0.22s ease-out forwards; }
+.auth-toast-icon { background: #10b981; color: #fff; border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+@keyframes toastSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 .user-avatar { align-items: center; background: #637e99; border-radius: 50%; color: #fff; display: inline-flex; font-size: 9px; font-weight: 700; height: 25px; justify-content: center; width: 25px; }
 .chevron { color: #758698; font-size: 10px; }
 .app-content { flex: 1; min-height: 0; overflow: hidden; padding: 27px 30px 42px; }

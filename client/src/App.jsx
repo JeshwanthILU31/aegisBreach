@@ -4,6 +4,7 @@ import AdminProjectsPage from './components/admin/AdminProjectsPage'
 import AdminBatchesPage from './components/admin/AdminBatchesPage'
 import AdminDocumentsPage from './components/admin/AdminDocumentsPage'
 import AdminRoute from './routes/AdminRoute'
+import { useAuth } from './context/AuthContext'
 
 function NotFoundPage() {
   return (
@@ -17,8 +18,17 @@ function NotFoundPage() {
 }
 
 function App() {
+  const { authNotice } = useAuth()
+
   return (
-    <Routes>
+    <>
+      {authNotice && (
+        <div className="auth-toast-notification" role="status" aria-live="polite">
+          <span className="auth-toast-icon">&#10003;</span>
+          <span>{authNotice}</span>
+        </div>
+      )}
+      <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -59,6 +69,7 @@ function App() {
       <Route path="/projects/:projectId/*" element={<ProjectWorkspace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   )
 }
 export default App

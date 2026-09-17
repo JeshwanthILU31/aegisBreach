@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import * as batchesApi from '../../services/batchesApi'
 import * as projectsApi from '../../services/projectsApi'
+import { useAuth } from '../../context/AuthContext'
 
 const emptyBatchForm = {
   name: '',
@@ -20,9 +21,15 @@ const simulatedReviewers = [
 ]
 
 export default function AdminBatchesPage() {
+  const { logout } = useAuth()
   const { projectId } = useParams()
   const navigate = useNavigate()
   const activeProjectId = projectId || 'project-orchid-6-7'
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
 
   const [project, setProject] = useState(null)
   const [allProjects, setAllProjects] = useState([])
@@ -224,6 +231,14 @@ export default function AdminBatchesPage() {
             <span className="user-avatar" style={{ background: '#7c3aed' }}>AD</span>
             <span>Admin</span>
           </div>
+          <button
+            className="logout-button"
+            type="button"
+            onClick={handleLogout}
+            title="Sign out"
+          >
+            Logout
+          </button>
         </div>
       </header>
 

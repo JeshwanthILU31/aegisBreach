@@ -42,7 +42,15 @@ export function AuthProvider({ children }) {
     }
   })
 
+  const [authNotice, setAuthNotice] = useState(null)
   const isAuthenticated = Boolean(token && user)
+
+  function showAuthNotice(message, duration = 3500) {
+    setAuthNotice(message)
+    setTimeout(() => {
+      setAuthNotice(null)
+    }, duration)
+  }
 
   async function login(identifier, password) {
     const data = await loginApi({ identifier, password })
@@ -50,7 +58,7 @@ export function AuthProvider({ children }) {
 
     // Store only minimal safe fields (id, username, email, role)
     const safeUser = {
-      id: receivedUser.id,
+      id: receivedUser.id || receivedUser._id,
       username: receivedUser.username,
       email: receivedUser.email,
       role: receivedUser.role,
@@ -65,7 +73,11 @@ export function AuthProvider({ children }) {
 
     setToken(receivedToken)
     setUser(safeUser)
-    return data
+
+    const roleLabel = safeUser.role === 'admin' ? 'Admin' : 'User'
+    showAuthNotice(`Logged in as ${roleLabel}`)
+
+    return { ...data, token: receivedToken, user: safeUser }
   }
 
   function logout() {
@@ -77,6 +89,7 @@ export function AuthProvider({ children }) {
     }
     setToken(null)
     setUser(null)
+    setAuthNotice(null)
   }
 
   return (
@@ -85,6 +98,8 @@ export function AuthProvider({ children }) {
         token,
         user,
         isAuthenticated,
+        authNotice,
+        showAuthNotice,
         login,
         logout,
       }}

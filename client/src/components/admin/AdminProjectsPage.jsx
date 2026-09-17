@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import * as projectsApi from '../../services/projectsApi'
+import { useAuth } from '../../context/AuthContext'
 
 const emptyProjectForm = {
   name: '',
@@ -13,7 +14,14 @@ const emptyProjectForm = {
 }
 
 export default function AdminProjectsPage() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
   const [projects, setProjects] = useState([])
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -188,6 +196,14 @@ export default function AdminProjectsPage() {
             <span className="user-avatar" style={{ background: '#7c3aed' }}>AD</span>
             <span>Admin</span>
           </div>
+          <button
+            className="logout-button"
+            type="button"
+            onClick={handleLogout}
+            title="Sign out"
+          >
+            Logout
+          </button>
         </div>
       </header>
 
