@@ -109,9 +109,6 @@ export default function Login() {
           <Link className="login-project-link" to="/register">
             Don't have an account? Register here
           </Link>
-          <Link className="login-project-link" to="/projects" style={{ marginTop: '8px' }}>
-            Continue to project selection
-          </Link>
         </div>
       </section>
     </main>
