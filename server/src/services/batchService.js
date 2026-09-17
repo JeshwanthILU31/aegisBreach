@@ -1,6 +1,8 @@
+import mongoose from 'mongoose'
 import Batch from '../models/Batch.js'
 import Document from '../models/Document.js'
 import Coding from '../models/Coding.js'
+import User from '../models/User.js'
 import { deleteAssetFromCloudinary } from './cloudinaryService.js'
 
 export async function getBatchesByProjectId(projectId, filters = {}) {
@@ -104,7 +106,7 @@ export async function deleteBatch(projectId, batchId) {
   return Batch.findOneAndDelete({ _id: batchId, projectId }).lean()
 }
 
-export async function acquireBatch(batchId, reviewerName = 'Current Reviewer') {
+export async function acquireBatch(batchId, authUser) {
   const batch = await Batch.findById(batchId)
   if (!batch) {
     const error = new Error('Batch not found')
@@ -120,16 +122,48 @@ export async function acquireBatch(batchId, reviewerName = 'Current Reviewer') {
     throw error
   }
 
+  // Resolve authentic reviewer identity from verified database user or auth payload
+  let userId = null
+  let displayName = 'Current Reviewer'
+
+  if (authUser && typeof authUser === 'object') {
+    if (authUser.userId) {
+      const isObjectId = mongoose.Types.ObjectId.isValid(authUser.userId)
+      if (isObjectId) {
+        userId = new mongoose.Types.ObjectId(authUser.userId)
+        const user = await User.findById(userId).select('username email').lean()
+        if (user) {
+          displayName = user.username || user.email || displayName
+        }
+      } else {
+        displayName = authUser.username || (authUser.role === 'admin' ? 'Admin' : displayName)
+      }
+    }
+  } else if (typeof authUser === 'string' && authUser.trim()) {
+    displayName = authUser.trim()
+  }
+
   // Check if reviewer already has an active in-progress batch in this project
-  const existingActiveBatch = await Batch.findOne({
+  const activeBatchQuery = {
     projectId: batch.projectId,
-    assignedToName: reviewerName,
     status: 'In Progress',
     isLocked: true,
-  }).lean()
+  }
+
+  if (userId) {
+    activeBatchQuery.$or = [
+      { lockedBy: userId },
+      { assignedTo: userId },
+      { assignedToName: displayName },
+    ]
+  } else {
+    activeBatchQuery.assignedToName = displayName
+  }
+
+  const existingActiveBatch = await Batch.findOne(activeBatchQuery).lean()
 
   if (existingActiveBatch) {
-    const error = new Error(`${reviewerName} already has an active batch. Complete it before acquiring another batch.`)
+    const error = new Error(`${displayName} already has an active batch. Complete it before acquiring another batch.`)
     error.status = 409
     error.activeBatch = existingActiveBatch
     throw error
@@ -141,17 +175,22 @@ export async function acquireBatch(batchId, reviewerName = 'Current Reviewer') {
     flrReviewedBy: { $exists: true, $ne: '' },
   })
 
+  const updateFields = {
+    isLocked: true,
+    status: 'In Progress',
+    assignedToName: displayName,
+    acquiredAt: new Date(),
+    reviewed: reviewedCount,
+  }
+
+  if (userId) {
+    updateFields.lockedBy = userId
+    updateFields.assignedTo = userId
+  }
+
   const updatedBatch = await Batch.findOneAndUpdate(
     { _id: batchId, isLocked: false },
-    {
-      $set: {
-        isLocked: true,
-        status: 'In Progress',
-        assignedToName: reviewerName,
-        acquiredAt: new Date(),
-        reviewed: reviewedCount,
-      },
-    },
+    { $set: updateFields },
     { returnDocument: 'after', runValidators: true }
   ).lean()
 
@@ -167,11 +206,59 @@ export async function acquireBatch(batchId, reviewerName = 'Current Reviewer') {
   return updatedBatch
 }
 
-export async function completeBatch(batchId, reviewerName = 'Current Reviewer') {
+export async function completeBatch(batchId, authUser) {
   const batch = await Batch.findById(batchId)
   if (!batch) {
     const error = new Error('Batch not found')
     error.status = 404
+    throw error
+  }
+
+  if (batch.status === 'Completed') {
+    const error = new Error('Batch is already completed')
+    error.status = 400
+    throw error
+  }
+
+  if (batch.status !== 'In Progress' || !batch.isLocked) {
+    const error = new Error('Batch is not currently in progress')
+    error.status = 400
+    throw error
+  }
+
+  // Verify ownership: Admin can complete, or the verified user who owns the batch
+  const isAdmin = authUser?.role === 'admin'
+  let isOwner = false
+
+  if (isAdmin) {
+    isOwner = true
+  } else if (authUser?.userId) {
+    const userIdStr = authUser.userId.toString()
+    const lockedByStr = batch.lockedBy ? batch.lockedBy.toString() : null
+    const assignedToStr = batch.assignedTo ? batch.assignedTo.toString() : null
+
+    if (lockedByStr === userIdStr || assignedToStr === userIdStr) {
+      isOwner = true
+    }
+  }
+
+  if (!isOwner) {
+    const error = new Error('Cannot complete a batch belonging to another user or employee.')
+    error.status = 403
+    throw error
+  }
+
+  // Verify completion requirement: all documents in the batch must have been reviewed
+  const batchDocs = await Document.find({ batchId: batch._id }).lean()
+  const totalBatchDocs = batchDocs.length
+  const reviewedDocs = batchDocs.filter((d) => Boolean(d.flrReviewedBy))
+  const reviewedCount = reviewedDocs.length
+
+  if (totalBatchDocs === 0 || reviewedCount < totalBatchDocs) {
+    const error = new Error(
+      `Cannot complete batch: all ${totalBatchDocs} documents must be reviewed first (${reviewedCount}/${totalBatchDocs} reviewed).`
+    )
+    error.status = 400
     throw error
   }
 
@@ -182,6 +269,7 @@ export async function completeBatch(batchId, reviewerName = 'Current Reviewer') 
         status: 'Completed',
         isLocked: false,
         completedAt: new Date(),
+        reviewed: totalBatchDocs,
       },
     },
     { returnDocument: 'after', runValidators: true }

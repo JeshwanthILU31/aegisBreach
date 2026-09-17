@@ -7,15 +7,20 @@ import {
   deleteDocument,
 } from '../controllers/documentController.js'
 import { validateIdOrSlug } from '../middleware/validateObjectId.js'
+import { authenticate } from '../middleware/authMiddleware.js'
+import { requireAdmin } from '../middleware/roleMiddleware.js'
 
 const documentRouter = Router({ mergeParams: true })
 
 documentRouter.use(validateIdOrSlug('projectId'))
+documentRouter.use(authenticate)
 
+// Reviewer/user read access
 documentRouter.get('/', getDocuments)
-documentRouter.post('/', createDocument)
-documentRouter.post('/bulk', createBulkDocuments)
 documentRouter.get('/:documentId', getDocument)
-documentRouter.delete('/:documentId', deleteDocument)
 
+// Admin-only document management & creation
+documentRouter.post('/', requireAdmin, createDocument)
+documentRouter.post('/bulk', requireAdmin, createBulkDocuments)
+documentRouter.delete('/:documentId', requireAdmin, deleteDocument)
 export default documentRouter

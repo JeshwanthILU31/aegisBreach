@@ -6,10 +6,13 @@ import documentRoutes from './routes/documentRoutes.js'
 import healthRoutes from './routes/healthRoutes.js'
 import projectRoutes from './routes/projectRoutes.js'
 import userRoutes from './routes/userRoutes.js'
+import authRoutes from './routes/authRoutes.js'
 import { acquireBatch, completeBatch } from './controllers/batchController.js'
 import { uploadDocumentFile } from './controllers/documentController.js'
 import { validateObjectId, validateIdOrSlug } from './middleware/validateObjectId.js'
 import { upload } from './middleware/uploadMiddleware.js'
+import { authenticate } from './middleware/authMiddleware.js'
+import { requireAdmin } from './middleware/roleMiddleware.js'
 import multer from 'multer'
 
 const app = express()
@@ -18,18 +21,22 @@ app.use(cors())
 app.use(express.json())
 
 app.use('/api/health', healthRoutes)
+app.use('/api/auth', authRoutes)
 app.use('/api/projects', projectRoutes)
 app.use('/api/projects/:projectId/batches', batchRoutes)
-app.post('/api/batches/:batchId/acquire', validateObjectId('batchId'), acquireBatch)
-app.post('/api/batches/:batchId/complete', validateObjectId('batchId'), completeBatch)
+app.post('/api/batches/:batchId/acquire', authenticate, validateObjectId('batchId'), acquireBatch)
+app.post('/api/batches/:batchId/complete', authenticate, validateObjectId('batchId'), completeBatch)
 
-// Cloudinary File Upload Endpoint
+// Cloudinary File Upload Endpoint (Admin Only)
 app.post(
   '/api/projects/:projectId/batches/:batchId/documents/:documentId/file',
+  authenticate,
+  requireAdmin,
   validateIdOrSlug('projectId'),
   upload.single('file'),
   uploadDocumentFile
 )
+
 
 app.use('/api/projects/:projectId/documents', documentRoutes)
 app.use('/api/projects/:projectId/documents/:documentId/coding', codingRoutes)
@@ -53,6 +60,3 @@ app.use((err, req, res, next) => {
 })
 
 export default app
-
-
-

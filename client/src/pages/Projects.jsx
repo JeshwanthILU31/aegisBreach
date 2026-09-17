@@ -27,19 +27,12 @@ export default function Projects() {
         </Link>
         <div className="workspace-picker"><span className="picker-search">x</span><select aria-label="Workspace list"><option>T048ap Workspaces</option></select></div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Link
-            className="legacy-button"
-            to="/admin"
-            style={{ textDecoration: 'none', color: '#fff', background: '#374151', border: '1px solid #4b5563', fontSize: '11px', padding: '3px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
-            title="Go to Admin Management"
-          >
-            <span>⚙️</span> Admin
-          </Link>
           <div className="selection-user">
             <span className="user-avatar">TR</span>
             <span>Training User</span>
           </div>
         </div>
+
       </header>
       <main className="selection-content">
         <div className="page-heading-row">

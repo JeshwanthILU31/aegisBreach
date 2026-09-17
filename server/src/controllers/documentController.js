@@ -3,7 +3,12 @@ import * as documentService from '../services/documentService.js'
 export async function getDocuments(request, response) {
   try {
     const { projectId } = request.params
-    const documents = await documentService.getDocumentsByProjectId(projectId, request.query)
+    const options = {
+      ...request.query,
+      userId: request.user?.userId,
+      role: request.user?.role,
+    }
+    const documents = await documentService.getDocumentsByProjectId(projectId, options)
     if (!documents) {
       return response.status(404).json({ error: 'Project not found' })
     }

@@ -38,12 +38,28 @@ export async function getDocumentsByProjectId(projectIdOrSlug, options = {}) {
     query.batchId = batchId
   } else if (view === 'My Batched Out Docs' || options.scope === 'my-batched-out') {
     // Current reviewer can only have ONE active in-progress batch
-    const activeBatch = await Batch.findOne({
+    const activeBatchQuery = {
       projectId: project._id,
       isLocked: true,
-      assignedToName: reviewerName,
       status: 'In Progress',
-    }).select('_id')
+    }
+
+    if (options.userId) {
+      const isObjectId = mongoose.Types.ObjectId.isValid(options.userId)
+      if (isObjectId) {
+        const uId = new mongoose.Types.ObjectId(options.userId)
+        activeBatchQuery.$or = [
+          { lockedBy: uId },
+          { assignedTo: uId },
+        ]
+      } else {
+        activeBatchQuery.assignedToName = reviewerName
+      }
+    } else {
+      activeBatchQuery.assignedToName = reviewerName
+    }
+
+    const activeBatch = await Batch.findOne(activeBatchQuery).select('_id')
 
     if (!activeBatch) {
       return []
@@ -63,7 +79,7 @@ export async function getDocumentsByProjectId(projectIdOrSlug, options = {}) {
   }
 
   const documents = await Document.find(query)
-    .populate('batchId', 'name batchSet status isLocked assignedToName')
+    .populate('batchId', 'name batchSet status isLocked assignedToName lockedBy assignedTo')
     .sort({ controlNumber: 1 })
     .lean()
 
@@ -81,7 +97,7 @@ export async function getDocumentById(projectIdOrSlug, documentId) {
   }
 
   const document = await Document.findOne(query)
-    .populate('batchId', 'name batchSet status isLocked assignedToName')
+    .populate('batchId', 'name batchSet status isLocked assignedToName lockedBy assignedTo')
     .lean()
 
   return document
@@ -157,7 +173,7 @@ export async function createDocument(projectIdOrSlug, data) {
   })
 
   const saved = await document.save()
-  return Document.findById(saved._id).populate('batchId', 'name batchSet status isLocked assignedToName').lean()
+  return Document.findById(saved._id).populate('batchId', 'name batchSet status isLocked assignedToName lockedBy assignedTo').lean()
 }
 
 export async function createDocumentsBulk(projectIdOrSlug, batchId, documentsArray) {
@@ -399,7 +415,7 @@ export async function uploadDocumentFile(projectIdOrSlug, batchId, documentId, f
       },
       { returnDocument: 'after', runValidators: true }
     )
-      .populate('batchId', 'name batchSet status isLocked assignedToName')
+      .populate('batchId', 'name batchSet status isLocked assignedToName lockedBy assignedTo')
       .lean()
 
     // On successful DB update, clean up old Cloudinary asset if replaced

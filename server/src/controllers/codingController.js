@@ -1,6 +1,8 @@
+import mongoose from 'mongoose'
 import Coding from '../models/Coding.js'
 import Document from '../models/Document.js'
 import Batch from '../models/Batch.js'
+import User from '../models/User.js'
 import * as documentService from '../services/documentService.js'
 
 const defaultCoding = (projectId, documentId) => ({
@@ -35,12 +37,20 @@ export async function getCoding(request, response) {
     }).lean()
 
     const batch = document.batchId
-    const isAssignedToMe = Boolean(
-      batch &&
-      batch.assignedToName === 'Current Reviewer' &&
-      batch.isLocked &&
-      batch.status === 'In Progress'
-    )
+    const authUser = request.user
+    const isAdmin = authUser?.role === 'admin'
+
+    let isAssignedToMe = false
+    if (isAdmin) {
+      isAssignedToMe = true
+    } else if (batch && batch.isLocked && batch.status === 'In Progress' && authUser?.userId) {
+      const userIdStr = authUser.userId.toString()
+      const lockedByStr = batch.lockedBy ? batch.lockedBy.toString() : null
+      const assignedToStr = batch.assignedTo ? batch.assignedTo.toString() : null
+      if (lockedByStr === userIdStr || assignedToStr === userIdStr) {
+        isAssignedToMe = true
+      }
+    }
 
     const result = {
       ...(coding || defaultCoding(projectId, document.controlNumber)),
@@ -66,7 +76,8 @@ export async function getCoding(request, response) {
 export async function saveCoding(request, response) {
   try {
     const { projectId, documentId } = request.params
-    const reviewerName = request.body?.reviewerName || 'Current Reviewer'
+    const authUser = request.user
+    const isAdmin = authUser?.role === 'admin'
 
     const document = await documentService.getDocumentById(projectId, documentId)
     if (!document) {
@@ -74,28 +85,76 @@ export async function saveCoding(request, response) {
     }
 
     const batch = document.batchId
-    if (
-      !batch ||
-      batch.assignedToName !== reviewerName ||
-      !batch.isLocked ||
-      batch.status !== 'In Progress'
-    ) {
-      return response.status(403).json({
-        error: "Cannot edit document belonging to another employee's batch.",
-        readOnly: true,
-        assignedToName: batch?.assignedToName || '',
-      })
+
+    // For normal users, enforce batch in-progress and verified ownership checks
+    if (!isAdmin) {
+      if (!batch) {
+        return response.status(403).json({
+          error: 'Document does not belong to a valid batch.',
+          readOnly: true,
+        })
+      }
+
+      // Must be In Progress and locked
+      if (!batch.isLocked || batch.status !== 'In Progress') {
+        return response.status(403).json({
+          error: 'Cannot edit document in a batch that is not currently in progress.',
+          readOnly: true,
+          assignedToName: batch.assignedToName || '',
+          batchStatus: batch.status,
+        })
+      }
+
+      // Check ownership
+      let isOwner = false
+      if (authUser?.userId) {
+        const userIdStr = authUser.userId.toString()
+        const lockedByStr = batch.lockedBy ? batch.lockedBy.toString() : null
+        const assignedToStr = batch.assignedTo ? batch.assignedTo.toString() : null
+
+        if (lockedByStr === userIdStr || assignedToStr === userIdStr) {
+          isOwner = true
+        }
+      }
+
+      if (!isOwner) {
+        return response.status(403).json({
+          error: "Cannot edit document belonging to another employee's batch.",
+          readOnly: true,
+          assignedToName: batch.assignedToName || '',
+        })
+      }
+    }
+
+    // Safe reviewer name derived from authenticated DB user / token
+    let reviewerName = 'Current Reviewer'
+    if (authUser?.userId) {
+      const isObjectId = mongoose.Types.ObjectId.isValid(authUser.userId)
+      if (isObjectId) {
+        const dbUser = await User.findById(authUser.userId).select('username email').lean()
+        if (dbUser) {
+          reviewerName = dbUser.username || dbUser.email || reviewerName
+        }
+      } else {
+        reviewerName = authUser.username || (isAdmin ? 'Admin' : reviewerName)
+      }
     }
 
     const payload = {
       ...defaultCoding(projectId, document.controlNumber),
       ...request.body,
-      projectId: document.projectId,
+      projectId: document.projectId.toString(),
       documentId: document.controlNumber,
     }
 
+    // Remove client-spoofed identities
+    delete payload.reviewerName
+    delete payload.userId
+    delete payload.role
+    delete payload.lockedBy
+
     const coding = await Coding.findOneAndUpdate(
-      { projectId: document.projectId, documentId: document.controlNumber },
+      { projectId: document.projectId.toString(), documentId: document.controlNumber },
       payload,
       { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     ).lean()
@@ -166,4 +225,3 @@ export async function saveCoding(request, response) {
     response.status(500).json({ error: error.message })
   }
 }
-

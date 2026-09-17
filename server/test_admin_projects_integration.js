@@ -1,6 +1,20 @@
 // Integration tests for Admin Step 2: Project Management APIs
+import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.join(__dirname, '.env') })
 
 const BASE_URL = 'http://localhost:5050/api'
+const secret = process.env.JWT_SECRET || 'secret'
+const adminToken = jwt.sign({ userId: 'test_admin_proj', role: 'admin' }, secret, { expiresIn: '1h' })
+
+const authHeaders = {
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${adminToken}`,
+}
 
 async function runTests() {
   console.log('=================================================================')
@@ -16,18 +30,27 @@ async function runTests() {
     console.log(`   Actual:   ${actual}\n`)
   }
 
-  const get = (url) => fetch(`${BASE_URL}${url}`).then(async (r) => ({ status: r.status, data: await r.json() }))
+  const get = (url) => fetch(`${BASE_URL}${url}`, {
+    headers: { Authorization: `Bearer ${adminToken}` }
+  }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
   const post = (url, body) => fetch(`${BASE_URL}${url}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders,
     body: JSON.stringify(body)
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
   const put = (url, body) => fetch(`${BASE_URL}${url}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders,
     body: JSON.stringify(body)
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
-  const del = (url) => fetch(`${BASE_URL}${url}`, { method: 'DELETE' }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
+  const del = (url) => fetch(`${BASE_URL}${url}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` }
+  }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
 
   try {
     // 1. GET all projects

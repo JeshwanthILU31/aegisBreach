@@ -1,8 +1,9 @@
 import { Link, Route, Routes } from 'react-router-dom'
-import { Login, ProjectWorkspace, Projects } from './pages'
+import { Login, Register, ProjectWorkspace, Projects } from './pages'
 import AdminProjectsPage from './components/admin/AdminProjectsPage'
 import AdminBatchesPage from './components/admin/AdminBatchesPage'
 import AdminDocumentsPage from './components/admin/AdminDocumentsPage'
+import AdminRoute from './routes/AdminRoute'
 
 function NotFoundPage() {
   return (
@@ -20,15 +21,44 @@ function App() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/projects" element={<Projects />} />
-      <Route path="/admin" element={<AdminProjectsPage />} />
-      <Route path="/admin/projects" element={<AdminProjectsPage />} />
-      <Route path="/admin/projects/:projectId/batches" element={<AdminBatchesPage />} />
-      <Route path="/admin/projects/:projectId/batches/:batchId/documents" element={<AdminDocumentsPage />} />
+
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <AdminProjectsPage />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/projects"
+        element={
+          <AdminRoute>
+            <AdminProjectsPage />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/projects/:projectId/batches"
+        element={
+          <AdminRoute>
+            <AdminBatchesPage />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/projects/:projectId/batches/:batchId/documents"
+        element={
+          <AdminRoute>
+            <AdminDocumentsPage />
+          </AdminRoute>
+        }
+      />
       <Route path="/projects/:projectId/*" element={<ProjectWorkspace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
-
 export default App

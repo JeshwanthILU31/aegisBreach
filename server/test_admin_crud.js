@@ -1,6 +1,20 @@
 // Isolated Test Suite for Admin Backend Step 1 (Document CRUD & Cascades)
+import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.join(__dirname, '.env') })
 
 const BASE_URL = 'http://localhost:5050/api'
+const secret = process.env.JWT_SECRET || 'secret'
+const adminToken = jwt.sign({ userId: 'test_admin_crud', role: 'admin' }, secret, { expiresIn: '1h' })
+
+const authHeaders = {
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${adminToken}`,
+}
 
 async function runAdminTests() {
   console.log('=================================================================')
@@ -18,20 +32,27 @@ async function runAdminTests() {
     console.log('')
   }
 
-  const get = (url) => fetch(`${BASE_URL}${url}`).then(async (r) => ({ status: r.status, data: await r.json() }))
+  const get = (url) => fetch(`${BASE_URL}${url}`, {
+    headers: { Authorization: `Bearer ${adminToken}` }
+  }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
   const post = (url, body) => fetch(`${BASE_URL}${url}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders,
     body: JSON.stringify(body)
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
   const put = (url, body) => fetch(`${BASE_URL}${url}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders,
     body: JSON.stringify(body)
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
   const del = (url) => fetch(`${BASE_URL}${url}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` }
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
 
   let testProjectA = null
   let testProjectB = null

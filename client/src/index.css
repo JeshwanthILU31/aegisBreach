@@ -82,6 +82,12 @@ input:focus { border-color: #527b9d; box-shadow: 0 0 0 1px #527b9d; }
 .primary-button:hover { background: #304f6b; }
 .login-project-link { display: block; font-size: 11px; margin-top: 20px; text-align: center; }
 .login-project-link:hover { text-decoration: underline; }
+.auth-alert { border-radius: 2px; font-size: 12px; line-height: 1.4; margin-top: 14px; padding: 10px 12px; }
+.auth-alert-error { background: #fef0f0; border: 1px solid #f5c2c2; color: #a93232; }
+.auth-alert-success { background: #eef8f2; border: 1px solid #bce2ca; color: #206d3e; }
+.auth-success-state { margin-top: 20px; }
+.auth-footer-links { border-top: 1px solid #eef1f5; margin-top: 20px; padding-top: 4px; }
+
 .not-found-state { padding: 40px; }
 .workspace-shell { background: #f6f6f7; }
 .workspace-shell .app-sidebar { background: #d1c3d9; color: #3d3d4a; flex-basis: 124px; min-height: 0; }

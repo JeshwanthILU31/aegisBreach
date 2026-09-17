@@ -24,8 +24,8 @@ export async function getUser(request, response) {
 
 export async function createUser(request, response) {
   try {
-    const { name, email } = request.body
-    if (!name || typeof name !== 'string' || !name.trim()) {
+    const { name, username, email } = request.body
+    if ((!name || typeof name !== 'string' || !name.trim()) && (!username || typeof username !== 'string' || !username.trim())) {
       return response.status(400).json({ error: 'User name is required' })
     }
     if (!email || typeof email !== 'string' || !email.trim()) {
@@ -36,7 +36,10 @@ export async function createUser(request, response) {
     response.status(201).json(user)
   } catch (error) {
     if (error.code === 11000) {
-      return response.status(409).json({ error: 'A user with that email already exists' })
+      const isUsername = error.keyPattern && error.keyPattern.username
+      return response.status(409).json({
+        error: isUsername ? 'A user with that username already exists' : 'A user with that email already exists',
+      })
     }
     if (error.name === 'ValidationError') {
       return response.status(400).json({ error: error.message })

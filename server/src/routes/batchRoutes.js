@@ -9,18 +9,23 @@ import {
   completeBatch,
 } from '../controllers/batchController.js'
 import { validateObjectId, validateIdOrSlug } from '../middleware/validateObjectId.js'
+import { authenticate } from '../middleware/authMiddleware.js'
+import { requireAdmin } from '../middleware/roleMiddleware.js'
 
 const batchRouter = Router({ mergeParams: true })
 
 batchRouter.use(validateIdOrSlug('projectId'))
+batchRouter.use(authenticate)
 
+// Reviewer/user read & workflow access
 batchRouter.get('/', getBatches)
-batchRouter.post('/', createBatch)
 batchRouter.get('/:batchId', validateObjectId('batchId'), getBatch)
-batchRouter.put('/:batchId', validateObjectId('batchId'), updateBatch)
-batchRouter.delete('/:batchId', validateObjectId('batchId'), deleteBatch)
 batchRouter.post('/:batchId/acquire', validateObjectId('batchId'), acquireBatch)
 batchRouter.post('/:batchId/complete', validateObjectId('batchId'), completeBatch)
 
-export default batchRouter
+// Admin-only mutation access
+batchRouter.post('/', requireAdmin, createBatch)
+batchRouter.put('/:batchId', validateObjectId('batchId'), requireAdmin, updateBatch)
+batchRouter.delete('/:batchId', validateObjectId('batchId'), requireAdmin, deleteBatch)
 
+export default batchRouter

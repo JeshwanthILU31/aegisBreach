@@ -97,8 +97,7 @@ export async function deleteBatch(request, response) {
 export async function acquireBatch(request, response) {
   try {
     const { batchId } = request.params
-    const { reviewerName } = request.body || {}
-    const updated = await batchService.acquireBatch(batchId, reviewerName)
+    const updated = await batchService.acquireBatch(batchId, request.user)
     response.json(updated)
   } catch (error) {
     if (error.status === 404) {
@@ -107,6 +106,9 @@ export async function acquireBatch(request, response) {
     if (error.status === 409) {
       return response.status(409).json({ error: error.message, batch: error.batch, activeBatch: error.activeBatch })
     }
+    if (error.status === 403) {
+      return response.status(403).json({ error: error.message })
+    }
     response.status(500).json({ error: error.message })
   }
 }
@@ -114,15 +116,18 @@ export async function acquireBatch(request, response) {
 export async function completeBatch(request, response) {
   try {
     const { batchId } = request.params
-    const { reviewerName } = request.body || {}
-    const updated = await batchService.completeBatch(batchId, reviewerName)
+    const updated = await batchService.completeBatch(batchId, request.user)
     response.json(updated)
   } catch (error) {
     if (error.status === 404) {
       return response.status(404).json({ error: error.message })
     }
+    if (error.status === 403) {
+      return response.status(403).json({ error: error.message })
+    }
+    if (error.status === 400) {
+      return response.status(400).json({ error: error.message })
+    }
     response.status(500).json({ error: error.message })
   }
 }
-
-

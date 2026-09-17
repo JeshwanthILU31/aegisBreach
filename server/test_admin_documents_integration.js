@@ -1,6 +1,20 @@
 // Integration tests for Admin Step 4: Document Management APIs & Reviewer Integrity
+import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.join(__dirname, '.env') })
 
 const BASE_URL = 'http://localhost:5050/api'
+const secret = process.env.JWT_SECRET || 'secret'
+const adminToken = jwt.sign({ userId: 'test_admin_doc', role: 'admin' }, secret, { expiresIn: '1h' })
+
+const authHeaders = {
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${adminToken}`,
+}
 
 async function runTests() {
   console.log('=================================================================')
@@ -16,18 +30,27 @@ async function runTests() {
     console.log(`   Actual:   ${actual}\n`)
   }
 
-  const get = (url) => fetch(`${BASE_URL}${url}`).then(async (r) => ({ status: r.status, data: await r.json() }))
-  const post = (url, body) => fetch(`${BASE_URL}${url}`, {
+  const get = (url, token) => fetch(`${BASE_URL}${url}`, {
+    headers: { Authorization: `Bearer ${token || adminToken}` }
+  }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
+  const post = (url, body, token) => fetch(`${BASE_URL}${url}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || adminToken}` },
     body: JSON.stringify(body)
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
-  const put = (url, body) => fetch(`${BASE_URL}${url}`, {
+
+  const put = (url, body, token) => fetch(`${BASE_URL}${url}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || adminToken}` },
     body: JSON.stringify(body)
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
-  const del = (url) => fetch(`${BASE_URL}${url}`, { method: 'DELETE' }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
+  const del = (url) => fetch(`${BASE_URL}${url}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` }
+  }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
 
   try {
     const suffix = Date.now()
@@ -153,35 +176,43 @@ async function runTests() {
     const passL = tL.status === 200 && tL.data.length === 1 && tL.data[0].controlNumber === `CTRL-PROJ2-${suffix}`
     logTest('L', 'Documents from another project are isolated', passL, `Proj 2 doc count=${tL.data?.length}, controlNumber=${tL.data[0]?.controlNumber}`, 'Complete cross-project document isolation')
 
+    // Setup Reviewer User for reviewer workflow integration
+    const reviewerUsername = `doc_rev_${suffix}`
+    await post('/auth/register', {
+      username: reviewerUsername,
+      email: `${reviewerUsername}@example.com`,
+      password: 'StrongPassword123!',
+    })
+    const loginRevRes = await post('/auth/login', {
+      identifier: reviewerUsername,
+      password: 'StrongPassword123!',
+    })
+    const reviewerToken = loginRevRes.data.token
+
     // Test M, N, O, P: Reviewer workflow integration & coding
     // Acquire Batch 1
-    const acqRes = await post(`/projects/${proj1Id}/batches/${batch1Id}/acquire`, {
-      reviewerName: 'Current Reviewer'
-    })
-    const passM = acqRes.status === 200 && acqRes.data.isLocked === true && acqRes.data.assignedToName === 'Current Reviewer'
+    const acqRes = await post(`/projects/${proj1Id}/batches/${batch1Id}/acquire`, {}, reviewerToken)
+    const passM = acqRes.status === 200 && acqRes.data.isLocked === true && acqRes.data.assignedToName === reviewerUsername
     logTest('M', 'Reviewer batch acquisition works', passM, `Status ${acqRes.status}, isLocked=${acqRes.data?.isLocked}`, 'Batch locked by Current Reviewer')
 
     // Verify My Batched Out Docs view
-    const myDocsRes = await get(`/projects/${proj1Id}/documents?view=My+Batched+Out+Docs&reviewerName=Current+Reviewer`)
+    const myDocsRes = await get(`/projects/${proj1Id}/documents?view=My+Batched+Out+Docs`, reviewerToken)
     const passN = myDocsRes.status === 200 && myDocsRes.data.length === 4
     logTest('N', 'My Batched Out Docs view correctly returns active batch documents', passN, `Status ${myDocsRes.status}, count=${myDocsRes.data?.length}`, 'Status 200, count 4')
 
     // Save coding on CTRL-001
     const codingRes = await put(`/projects/${proj1Id}/documents/CTRL-001-${suffix}/coding`, {
-      reviewerName: 'Current Reviewer',
       flrComplete: 'Yes',
       extractionStatus: 'Completed',
       reportableDataFound: 'Yes',
       comments: 'Verified coding'
-    })
-    const getSavedDoc = await get(`/projects/${proj1Id}/documents/CTRL-001-${suffix}`)
-    const passO = codingRes.status === 200 && getSavedDoc.status === 200 && getSavedDoc.data.flrReviewedBy === 'Current Reviewer'
+    }, reviewerToken)
+    const getSavedDoc = await get(`/projects/${proj1Id}/documents/CTRL-001-${suffix}`, reviewerToken)
+    const passO = codingRes.status === 200 && getSavedDoc.status === 200 && getSavedDoc.data.flrReviewedBy === reviewerUsername
     logTest('O', 'Coding save works and updates document review metadata', passO, `Status ${codingRes.status}, Doc flrReviewedBy="${getSavedDoc.data?.flrReviewedBy}"`, 'Status 200, reviewed doc with flrReviewedBy')
 
     // Verify single-active-batch rule
-    const acq2Res = await post(`/projects/${proj1Id}/batches/${batch2Id}/acquire`, {
-      reviewerName: 'Current Reviewer'
-    })
+    const acq2Res = await post(`/projects/${proj1Id}/batches/${batch2Id}/acquire`, {}, reviewerToken)
     const passP = acq2Res.status === 409
     logTest('P', 'Single-active-batch rule prevents acquiring 2nd batch', passP, `Status ${acq2Res.status} (Error: "${acq2Res.data?.error}")`, 'Status 409 Conflict')
 

@@ -1,6 +1,20 @@
 // Integration tests for Admin Step 3: Batch Management APIs & Reviewer Integrity
+import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.join(__dirname, '.env') })
 
 const BASE_URL = 'http://localhost:5050/api'
+const secret = process.env.JWT_SECRET || 'secret'
+const adminToken = jwt.sign({ userId: 'test_admin_batch', role: 'admin' }, secret, { expiresIn: '1h' })
+
+const authHeaders = {
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${adminToken}`,
+}
 
 async function runTests() {
   console.log('=================================================================')
@@ -16,18 +30,27 @@ async function runTests() {
     console.log(`   Actual:   ${actual}\n`)
   }
 
-  const get = (url) => fetch(`${BASE_URL}${url}`).then(async (r) => ({ status: r.status, data: await r.json() }))
-  const post = (url, body) => fetch(`${BASE_URL}${url}`, {
+  const get = (url, token) => fetch(`${BASE_URL}${url}`, {
+    headers: { Authorization: `Bearer ${token || adminToken}` }
+  }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
+  const post = (url, body, token) => fetch(`${BASE_URL}${url}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || adminToken}` },
     body: JSON.stringify(body)
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
-  const put = (url, body) => fetch(`${BASE_URL}${url}`, {
+
+  const put = (url, body, token) => fetch(`${BASE_URL}${url}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || adminToken}` },
     body: JSON.stringify(body)
   }).then(async (r) => ({ status: r.status, data: await r.json() }))
-  const del = (url) => fetch(`${BASE_URL}${url}`, { method: 'DELETE' }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
+  const del = (url) => fetch(`${BASE_URL}${url}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` }
+  }).then(async (r) => ({ status: r.status, data: await r.json() }))
+
 
   try {
     const suffix = Date.now()
@@ -141,6 +164,19 @@ async function runTests() {
     const passH = otherBatchesList.status === 200 && otherBatchesList.data.some(b => b._id === otherBatchId)
     logTest('H', 'Verify other project batches remain untouched', passH, `Other project batch count=${otherBatchesList.data?.length}`, 'Isolated project batches unaffected')
 
+    // Setup Reviewer User for reviewer workflow integration
+    const reviewerUsername = `rev_batch_${suffix}`
+    await post('/auth/register', {
+      username: reviewerUsername,
+      email: `${reviewerUsername}@example.com`,
+      password: 'StrongPassword123!',
+    })
+    const loginRevRes = await post('/auth/login', {
+      identifier: reviewerUsername,
+      password: 'StrongPassword123!',
+    })
+    const reviewerToken = loginRevRes.data.token
+
     // Test I: Verify existing batch acquisition still works
     const acqBatchRes = await post(`/projects/${tempProjId}/batches`, {
       name: `Acquisition_Test_Batch_${suffix}`,
@@ -148,13 +184,11 @@ async function runTests() {
     })
     const acqBatchId = acqBatchRes.data._id
 
-    const acquireRes = await post(`/projects/${tempProjId}/batches/${acqBatchId}/acquire`, {
-      reviewerName: `Reviewer_Temp_${suffix}`
-    })
+    const acquireRes = await post(`/projects/${tempProjId}/batches/${acqBatchId}/acquire`, {}, reviewerToken)
     const passI = acquireRes.status === 200 &&
       acquireRes.data.isLocked === true &&
       acquireRes.data.status === 'In Progress' &&
-      acquireRes.data.assignedToName === `Reviewer_Temp_${suffix}`
+      acquireRes.data.assignedToName === reviewerUsername
     logTest('I', 'Verify batch acquisition works and updates lock/status/assignee', passI, `Status ${acquireRes.status}, isLocked=${acquireRes.data?.isLocked}, assignedTo=${acquireRes.data?.assignedToName}`, 'Status 200, batch locked by reviewer')
 
     // Test J: Verify single-active-batch rule still works
@@ -164,9 +198,7 @@ async function runTests() {
     })
     const secondBatchId = secondBatchRes.data._id
 
-    const acquireSecondRes = await post(`/projects/${tempProjId}/batches/${secondBatchId}/acquire`, {
-      reviewerName: `Reviewer_Temp_${suffix}`
-    })
+    const acquireSecondRes = await post(`/projects/${tempProjId}/batches/${secondBatchId}/acquire`, {}, reviewerToken)
     const passJ = acquireSecondRes.status === 409
     logTest('J', 'Verify single-active-batch rule prevents acquiring 2nd batch', passJ, `Status ${acquireSecondRes.status} (Error: "${acquireSecondRes.data?.error}")`, 'Status 409 Conflict')
 
@@ -178,7 +210,7 @@ async function runTests() {
     })
     const passK = adminEditActiveBatchRes.status === 200 &&
       adminEditActiveBatchRes.data.isLocked === true &&
-      adminEditActiveBatchRes.data.assignedToName === `Reviewer_Temp_${suffix}` &&
+      adminEditActiveBatchRes.data.assignedToName === reviewerUsername &&
       adminEditActiveBatchRes.data.name === `Acquisition_Renamed_${suffix}`
     logTest('K', 'Verify Current Reviewer active batch is not accidentally reassigned/unlocked', passK, `Status ${adminEditActiveBatchRes.status}, isLocked=${adminEditActiveBatchRes.data?.isLocked}, assignedTo=${adminEditActiveBatchRes.data?.assignedToName}`, 'Reviewer lock and assignment protected during admin edit')
 
@@ -189,10 +221,9 @@ async function runTests() {
       fileName: 'reviewable_doc_1.pdf'
     })
     await put(`/projects/${tempProjId}/documents/ACQ-DOC-1-${suffix}/coding`, {
-      reviewerName: `Reviewer_Temp_${suffix}`,
-      flrReviewedBy: `Reviewer_Temp_${suffix}`,
+      flrComplete: 'Yes',
       extractionStatus: 'Completed'
-    })
+    }, reviewerToken)
     const getAcqBatch = await get(`/projects/${tempProjId}/batches/${acqBatchId}`)
     const passL = getAcqBatch.status === 200 && getAcqBatch.data.reviewed === 1
     logTest('L', 'Verify batch reviewed count accurately reflects completed documents', passL, `Status ${getAcqBatch.status}, reviewed=${getAcqBatch.data?.reviewed} / ${getAcqBatch.data?.batchSize}`, 'Batch reviewed count matches reviewed documents (1)')
