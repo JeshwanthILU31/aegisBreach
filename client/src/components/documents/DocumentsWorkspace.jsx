@@ -122,7 +122,18 @@ function PersonTracker({ onClose }) {
   const [position, setPosition] = useState({ x: 250, y: 96 })
   const drag = useRef(null)
   const [form, setForm] = useState({})
-  const fields = ['Item Number', 'PersonDocLink', 'FIRST NAME *', 'MIDDLE NAME', 'LAST NAME *', 'SUFFIX', 'ADDRESS', 'CITY', 'STATE', 'ZIP', 'INTERNATIONAL ADDRESS', 'COUNTRY', 'DOB', 'SSN', 'HOSPITAL/HEALTH CENTER *']
+  const fields = [
+    'Item Number', 'PersonDocLink', 'FIRST NAME *', 'MIDDLE NAME', 'LAST NAME *', 'SUFFIX',
+    'ADDRESS', 'CITY', 'STATE', 'ZIP', 'INTERNATIONAL ADDRESS', 'COUNTRY', 'TIN',
+    'Financial Account Number', 'Financial Routing Number - Internal', 'Payment Card Number',
+    'Passport Number', 'Military ID Number', "Driver's License Number", 'Other Government Issued ID Number',
+    'Other Government Issued Type', 'Alien Registration Number', 'Tribal Identification Number',
+    'Patient Account Number', 'Medicaid / Medicare Number', 'Date of Death',
+    'DOB', 'SSN', 'Financial Institution Name', 'Login Platform', 'Payment Card Expiration Date',
+    'Passport Issuing Country', 'Passport Expiration Date', 'DL State', 'Other Government Issued ID Country',
+    'Student ID Number', 'State Identification Card Number', 'Medical Record Number',
+    'Health Insurance Policy Number', 'Data Owner *'
+  ]
   const updatePosition = (event) => { if (!drag.current) return; setPosition({ x: Math.max(12, event.clientX - drag.current.offsetX), y: Math.max(12, event.clientY - drag.current.offsetY) }) }
   const stopDrag = () => { drag.current = null; window.removeEventListener('mousemove', updatePosition); window.removeEventListener('mouseup', stopDrag) }
   const startDrag = (event) => { drag.current = { offsetX: event.clientX - position.x, offsetY: event.clientY - position.y }; window.addEventListener('mousemove', updatePosition); window.addEventListener('mouseup', stopDrag) }

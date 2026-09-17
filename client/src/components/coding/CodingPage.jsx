@@ -18,7 +18,65 @@ const defaultCoding = {
   persons: [],
 }
 
-const emptyPerson = { personDocLink: '', firstName: '', lastName: '', role: '' }
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  'DC', 'PR', 'VI', 'GU', 'Other',
+]
+
+const emptyPerson = {
+  itemNumber: '',
+  personDocLink: '',
+  firstName: '',
+  middleName: '',
+  lastName: '',
+  suffix: '',
+  address: '',
+  city: '',
+  internationalAddress: '',
+  country: '',
+  tin: '',
+  financialAccountNumber: '',
+  financialRoutingNumberInternal: '',
+  financialRoutingNumber: '',
+  paymentCardNumber: '',
+  passportNumber: '',
+  militaryIdNumber: '',
+  driversLicenseNumber: '',
+  otherGovernmentIssuedIdNumber: '',
+  otherGovIdNumber: '',
+  otherGovernmentIssuedType: '',
+  otherGovIdType: '',
+  alienRegistrationNumber: '',
+  tribalIdentificationNumber: '',
+  tribalIdNumber: '',
+  patientAccountNumber: '',
+  medicaidMedicareNumber: '',
+  dateOfDeath: '',
+  state: '',
+  zip: '',
+  dob: '',
+  ssn: '',
+  financialInstitutionName: '',
+  loginPlatform: '',
+  paymentCardExpirationDate: '',
+  passportIssuingCountry: '',
+  passportExpirationDate: '',
+  dlState: '',
+  otherGovernmentIssuedIdCountry: '',
+  otherGovIdCountry: '',
+  studentIdNumber: '',
+  stateIdentificationCardNumber: '',
+  stateIdCardNumber: '',
+  medicalRecordNumber: '',
+  healthInsurancePolicyNumber: '',
+  dataOwner: '',
+  role: '',
+  hospital: '',
+}
 
 function Section({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -46,7 +104,543 @@ function CodingField({ label, children }) {
   )
 }
 
-function PersonTracker({ persons, setPersons, readOnly }) {
+function PersonTrackerModal({
+  draft,
+  updateDraft,
+  onSave,
+  onClose,
+  position,
+  isDragging,
+  handleMouseDown,
+}) {
+  return (
+    <div className="person-tracker-overlay">
+      <div
+        className="person-tracker-entry-window"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="person-tracker-title"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          cursor: isDragging ? 'grabbing' : 'default',
+        }}
+      >
+        {/* Top Header Bar matching Relativity layout */}
+        <div
+          className="person-tracker-topbar"
+          onMouseDown={handleMouseDown}
+          style={{ cursor: 'grab', userSelect: 'none' }}
+        >
+          <div className="person-tracker-topbar-left">
+            <span className="person-tracker-layout-badge">
+              Person Tracker Layout ▼
+            </span>
+          </div>
+          <div className="person-tracker-topbar-actions">
+            <button
+              className="person-tracker-save-btn"
+              type="button"
+              onClick={onSave}
+            >
+              Save
+            </button>
+            <button
+              className="person-tracker-cancel-btn"
+              type="button"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              className="person-tracker-close-btn"
+              type="button"
+              onClick={onClose}
+              aria-label="Close person tracker form"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Subheader: Entry title & PersonDocLink */}
+        <div className="person-tracker-subheader">
+          <span className="person-tracker-entry-title" id="person-tracker-title">
+            Person Tracker Entry
+          </span>
+          <div className="person-tracker-doclink-display">
+            <span>PersonDocLink</span>
+            <input
+              className="person-tracker-doclink-input"
+              value={draft.personDocLink || ''}
+              onChange={(e) => updateDraft('personDocLink', e.target.value)}
+              placeholder="CNTRL_..."
+            />
+          </div>
+        </div>
+
+        {/* 2-Column Form Body */}
+        <div className="person-tracker-grid-body">
+          {/* LEFT COLUMN */}
+          <div className="person-tracker-column">
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Item Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.itemNumber || ''}
+                  onChange={(e) => updateDraft('itemNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">
+                First Name <span className="req-star">*</span>
+              </label>
+              <div className="person-tracker-control">
+                <input
+                  autoFocus
+                  value={draft.firstName || ''}
+                  onChange={(e) => updateDraft('firstName', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Middle Name</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.middleName || ''}
+                  onChange={(e) => updateDraft('middleName', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">
+                Last Name <span className="req-star">*</span>
+              </label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.lastName || ''}
+                  onChange={(e) => updateDraft('lastName', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Suffix</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.suffix || ''}
+                  onChange={(e) => updateDraft('suffix', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Address</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.address || ''}
+                  onChange={(e) => updateDraft('address', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">City</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.city || ''}
+                  onChange={(e) => updateDraft('city', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">International Address</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.internationalAddress || ''}
+                  onChange={(e) => updateDraft('internationalAddress', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Country</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.country || ''}
+                  onChange={(e) => updateDraft('country', e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="person-tracker-select-btn"
+                  onClick={() => updateDraft('country', draft.country || 'USA')}
+                >
+                  Select
+                </button>
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">TIN</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.tin || ''}
+                  onChange={(e) => updateDraft('tin', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Financial Account Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.financialAccountNumber || ''}
+                  onChange={(e) => updateDraft('financialAccountNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Financial Routing Number - Internal</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.financialRoutingNumberInternal || draft.financialRoutingNumber || ''}
+                  onChange={(e) => {
+                    updateDraft('financialRoutingNumberInternal', e.target.value)
+                    updateDraft('financialRoutingNumber', e.target.value)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Payment Card Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.paymentCardNumber || ''}
+                  onChange={(e) => updateDraft('paymentCardNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Passport Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.passportNumber || ''}
+                  onChange={(e) => updateDraft('passportNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Military ID Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.militaryIdNumber || ''}
+                  onChange={(e) => updateDraft('militaryIdNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Driver's License Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.driversLicenseNumber || ''}
+                  onChange={(e) => updateDraft('driversLicenseNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Other Government Issued ID Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.otherGovernmentIssuedIdNumber || draft.otherGovIdNumber || ''}
+                  onChange={(e) => {
+                    updateDraft('otherGovernmentIssuedIdNumber', e.target.value)
+                    updateDraft('otherGovIdNumber', e.target.value)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Other Government Issued Type</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.otherGovernmentIssuedType || draft.otherGovIdType || ''}
+                  onChange={(e) => {
+                    updateDraft('otherGovernmentIssuedType', e.target.value)
+                    updateDraft('otherGovIdType', e.target.value)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Alien Registration Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.alienRegistrationNumber || ''}
+                  onChange={(e) => updateDraft('alienRegistrationNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Tribal Identification Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.tribalIdentificationNumber || draft.tribalIdNumber || ''}
+                  onChange={(e) => {
+                    updateDraft('tribalIdentificationNumber', e.target.value)
+                    updateDraft('tribalIdNumber', e.target.value)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Patient Account Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.patientAccountNumber || ''}
+                  onChange={(e) => updateDraft('patientAccountNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Medicaid / Medicare Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.medicaidMedicareNumber || ''}
+                  onChange={(e) => updateDraft('medicaidMedicareNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Date of Death</label>
+              <div className="person-tracker-control">
+                <input
+                  placeholder="mm/dd/yyyy"
+                  value={draft.dateOfDeath || ''}
+                  onChange={(e) => updateDraft('dateOfDeath', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div className="person-tracker-column">
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">State</label>
+              <div className="person-tracker-control">
+                <select
+                  value={draft.state || ''}
+                  onChange={(e) => updateDraft('state', e.target.value)}
+                >
+                  <option value="">Choose...</option>
+                  {US_STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">ZIP</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.zip || ''}
+                  onChange={(e) => updateDraft('zip', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">DOB</label>
+              <div className="person-tracker-control">
+                <input
+                  placeholder="mm/dd/yyyy"
+                  value={draft.dob || ''}
+                  onChange={(e) => updateDraft('dob', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">SSN</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.ssn || ''}
+                  onChange={(e) => updateDraft('ssn', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Financial Institution Name</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.financialInstitutionName || ''}
+                  onChange={(e) => updateDraft('financialInstitutionName', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Login Platform</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.loginPlatform || ''}
+                  onChange={(e) => updateDraft('loginPlatform', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Payment Card Expiration Date</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.paymentCardExpirationDate || ''}
+                  onChange={(e) => updateDraft('paymentCardExpirationDate', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Passport Issuing Country</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.passportIssuingCountry || ''}
+                  onChange={(e) => updateDraft('passportIssuingCountry', e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="person-tracker-select-btn"
+                  onClick={() => updateDraft('passportIssuingCountry', draft.passportIssuingCountry || 'USA')}
+                >
+                  Select
+                </button>
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Passport Expiration Date</label>
+              <div className="person-tracker-control">
+                <input
+                  placeholder="mm/dd/yyyy"
+                  value={draft.passportExpirationDate || ''}
+                  onChange={(e) => updateDraft('passportExpirationDate', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">DL State</label>
+              <div className="person-tracker-control">
+                <select
+                  value={draft.dlState || ''}
+                  onChange={(e) => updateDraft('dlState', e.target.value)}
+                >
+                  <option value="">Choose...</option>
+                  {US_STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Other Government Issued ID Country</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.otherGovernmentIssuedIdCountry || draft.otherGovIdCountry || ''}
+                  onChange={(e) => {
+                    updateDraft('otherGovernmentIssuedIdCountry', e.target.value)
+                    updateDraft('otherGovIdCountry', e.target.value)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Student ID Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.studentIdNumber || ''}
+                  onChange={(e) => updateDraft('studentIdNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">State Identification Card Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.stateIdentificationCardNumber || draft.stateIdCardNumber || ''}
+                  onChange={(e) => {
+                    updateDraft('stateIdentificationCardNumber', e.target.value)
+                    updateDraft('stateIdCardNumber', e.target.value)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Medical Record Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.medicalRecordNumber || ''}
+                  onChange={(e) => updateDraft('medicalRecordNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">Health Insurance Policy Number</label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.healthInsurancePolicyNumber || ''}
+                  onChange={(e) => updateDraft('healthInsurancePolicyNumber', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="person-tracker-row">
+              <label className="person-tracker-label">
+                Data Owner <span className="req-star">*</span>
+              </label>
+              <div className="person-tracker-control">
+                <input
+                  value={draft.dataOwner || draft.role || ''}
+                  onChange={(e) => {
+                    updateDraft('dataOwner', e.target.value)
+                    updateDraft('role', e.target.value)
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PersonTracker({ persons, setPersons, readOnly, currentDocControlNumber }) {
   const [draft, setDraft] = useState(emptyPerson)
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -55,7 +649,7 @@ function PersonTracker({ persons, setPersons, readOnly }) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
 
   const handleMouseDown = (e) => {
-    if (e.target.tagName === 'BUTTON') return
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return
     setIsDragging(true)
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
   }
@@ -89,7 +683,7 @@ function PersonTracker({ persons, setPersons, readOnly }) {
   const updateDraft = (key, value) => setDraft((current) => ({ ...current, [key]: value }))
 
   const addPerson = () => {
-    if (!draft.firstName && !draft.lastName && !draft.personDocLink) return
+    if (!draft.firstName && !draft.lastName && !draft.personDocLink && !draft.dataOwner) return
     setPersons((current) => [...current, draft])
     setDraft(emptyPerson)
     setShowForm(false)
@@ -109,7 +703,7 @@ function PersonTracker({ persons, setPersons, readOnly }) {
           type="button"
           disabled={readOnly}
           onClick={() => {
-            setDraft(emptyPerson)
+            setDraft({ ...emptyPerson, personDocLink: currentDocControlNumber || '' })
             setPosition({ x: 0, y: 0 })
             setShowForm(true)
           }}
@@ -121,7 +715,7 @@ function PersonTracker({ persons, setPersons, readOnly }) {
           type="button"
           disabled={readOnly}
           onClick={() => {
-            setDraft(emptyPerson)
+            setDraft({ ...emptyPerson, personDocLink: currentDocControlNumber || '' })
             setPosition({ x: 0, y: 0 })
             setShowForm(true)
           }}
@@ -163,8 +757,11 @@ function PersonTracker({ persons, setPersons, readOnly }) {
         <CodingField label="Role">
           <input
             disabled={readOnly}
-            value={draft.role}
-            onChange={(event) => updateDraft('role', event.target.value)}
+            value={draft.role || draft.dataOwner || ''}
+            onChange={(event) => {
+              updateDraft('role', event.target.value)
+              updateDraft('dataOwner', event.target.value)
+            }}
           />
         </CodingField>
       </div>
@@ -190,7 +787,7 @@ function PersonTracker({ persons, setPersons, readOnly }) {
                   <td>{person.personDocLink}</td>
                   <td>{person.firstName}</td>
                   <td>{person.lastName}</td>
-                  <td>{person.role}</td>
+                  <td>{person.role || person.dataOwner || ''}</td>
                 </tr>
               ))
             ) : (
@@ -205,81 +802,15 @@ function PersonTracker({ persons, setPersons, readOnly }) {
       </div>
 
       {showForm && (
-        <div className="person-tracker-overlay">
-          <div
-            className="person-tracker-form"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="person-tracker-title"
-            style={{
-              transform: `translate(${position.x}px, ${position.y}px)`,
-              cursor: isDragging ? 'grabbing' : 'default',
-            }}
-          >
-            <div
-              className="person-tracker-form-header"
-              onMouseDown={handleMouseDown}
-              style={{ cursor: 'grab', userSelect: 'none' }}
-            >
-              <strong id="person-tracker-title">New Person Tracker</strong>
-              <button type="button" onClick={() => setShowForm(false)} aria-label="Close person tracker form">
-                x
-              </button>
-            </div>
-            <div className="person-tracker-form-body">
-              <CodingField label="Item Number">
-                <input value={draft.itemNumber || ''} onChange={(event) => updateDraft('itemNumber', event.target.value)} />
-              </CodingField>
-              <CodingField label="PersonDocLink">
-                <input value={draft.personDocLink} onChange={(event) => updateDraft('personDocLink', event.target.value)} />
-              </CodingField>
-              <CodingField label="FIRST NAME *">
-                <input autoFocus value={draft.firstName} onChange={(event) => updateDraft('firstName', event.target.value)} />
-              </CodingField>
-              <CodingField label="MIDDLE NAME">
-                <input value={draft.middleName || ''} onChange={(event) => updateDraft('middleName', event.target.value)} />
-              </CodingField>
-              <CodingField label="LAST NAME *">
-                <input value={draft.lastName} onChange={(event) => updateDraft('lastName', event.target.value)} />
-              </CodingField>
-              <CodingField label="SUFFIX">
-                <input value={draft.suffix || ''} onChange={(event) => updateDraft('suffix', event.target.value)} />
-              </CodingField>
-              <CodingField label="ADDRESS">
-                <input value={draft.address || ''} onChange={(event) => updateDraft('address', event.target.value)} />
-              </CodingField>
-              <CodingField label="CITY">
-                <input value={draft.city || ''} onChange={(event) => updateDraft('city', event.target.value)} />
-              </CodingField>
-              <CodingField label="STATE">
-                <input value={draft.state || ''} onChange={(event) => updateDraft('state', event.target.value)} />
-              </CodingField>
-              <CodingField label="ZIP">
-                <input value={draft.zip || ''} onChange={(event) => updateDraft('zip', event.target.value)} />
-              </CodingField>
-              <CodingField label="COUNTRY">
-                <input value={draft.country || ''} onChange={(event) => updateDraft('country', event.target.value)} />
-              </CodingField>
-              <CodingField label="DOB">
-                <input value={draft.dob || ''} onChange={(event) => updateDraft('dob', event.target.value)} />
-              </CodingField>
-              <CodingField label="SSN">
-                <input value={draft.ssn || ''} onChange={(event) => updateDraft('ssn', event.target.value)} />
-              </CodingField>
-              <CodingField label="HOSPITAL/HEALTH CENTER *">
-                <input value={draft.hospital || ''} onChange={(event) => updateDraft('hospital', event.target.value)} />
-              </CodingField>
-            </div>
-            <div className="person-tracker-form-footer">
-              <button className="legacy-button primary-legacy" type="button" onClick={addPerson}>
-                Save
-              </button>
-              <button className="legacy-button" type="button" onClick={() => setShowForm(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+        <PersonTrackerModal
+          draft={draft}
+          updateDraft={updateDraft}
+          onSave={addPerson}
+          onClose={() => setShowForm(false)}
+          position={position}
+          isDragging={isDragging}
+          handleMouseDown={handleMouseDown}
+        />
       )}
     </>
   )
@@ -932,6 +1463,7 @@ export default function CodingPage() {
                     persons={coding.persons || []}
                     setPersons={updatePersons}
                     readOnly={readOnly}
+                    currentDocControlNumber={document?.controlNumber || ''}
                   />
                 </Section>
 
@@ -1115,7 +1647,8 @@ export default function CodingPage() {
                         type="button"
                         disabled={readOnly}
                         onClick={() => {
-                          setAwfPersonDraft(emptyPerson)
+                          setAwfPersonDraft({ ...emptyPerson, personDocLink: document?.controlNumber || '' })
+                          setAwfPosition({ x: 0, y: 0 })
                           setShowAwfPersonForm(true)
                         }}
                       >
@@ -1126,7 +1659,8 @@ export default function CodingPage() {
                         type="button"
                         disabled={readOnly}
                         onClick={() => {
-                          setAwfPersonDraft(emptyPerson)
+                          setAwfPersonDraft({ ...emptyPerson, personDocLink: document?.controlNumber || '' })
+                          setAwfPosition({ x: 0, y: 0 })
                           setShowAwfPersonForm(true)
                         }}
                       >
@@ -1164,7 +1698,7 @@ export default function CodingPage() {
                               <td>{person.personDocLink}</td>
                               <td>{person.firstName}</td>
                               <td>{person.lastName}</td>
-                              <td>{person.role}</td>
+                              <td>{person.role || person.dataOwner || ''}</td>
                             </tr>
                           ))
                         ) : (
@@ -1222,138 +1756,15 @@ export default function CodingPage() {
 
       {/* Person Tracker Modal for Alternate Workflow layout */}
       {showAwfPersonForm && (
-        <div className="person-tracker-overlay">
-          <div
-            className="person-tracker-form"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="awf-person-tracker-title"
-            style={{
-              transform: `translate(${awfPosition.x}px, ${awfPosition.y}px)`,
-              cursor: isAwfDragging ? 'grabbing' : 'default',
-            }}
-          >
-            <div
-              className="person-tracker-form-header"
-              onMouseDown={handleAwfMouseDown}
-              style={{ cursor: 'grab', userSelect: 'none' }}
-            >
-              <strong id="awf-person-tracker-title">New Person Tracker</strong>
-              <button type="button" onClick={() => setShowAwfPersonForm(false)} aria-label="Close person tracker form">
-                x
-              </button>
-            </div>
-            <div className="person-tracker-form-body">
-              <label className="coding-field">
-                <span>Item Number</span>
-                <input
-                  value={awfPersonDraft.itemNumber || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, itemNumber: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>PersonDocLink</span>
-                <input
-                  value={awfPersonDraft.personDocLink || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, personDocLink: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>FIRST NAME *</span>
-                <input
-                  autoFocus
-                  value={awfPersonDraft.firstName || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, firstName: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>MIDDLE NAME</span>
-                <input
-                  value={awfPersonDraft.middleName || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, middleName: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>LAST NAME *</span>
-                <input
-                  value={awfPersonDraft.lastName || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, lastName: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>SUFFIX</span>
-                <input
-                  value={awfPersonDraft.suffix || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, suffix: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>ADDRESS</span>
-                <input
-                  value={awfPersonDraft.address || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, address: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>CITY</span>
-                <input
-                  value={awfPersonDraft.city || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, city: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>STATE</span>
-                <input
-                  value={awfPersonDraft.state || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, state: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>ZIP</span>
-                <input
-                  value={awfPersonDraft.zip || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, zip: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>COUNTRY</span>
-                <input
-                  value={awfPersonDraft.country || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, country: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>DOB</span>
-                <input
-                  value={awfPersonDraft.dob || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, dob: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>SSN</span>
-                <input
-                  value={awfPersonDraft.ssn || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, ssn: e.target.value }))}
-                />
-              </label>
-              <label className="coding-field">
-                <span>HOSPITAL/HEALTH CENTER *</span>
-                <input
-                  value={awfPersonDraft.hospital || ''}
-                  onChange={(e) => setAwfPersonDraft((c) => ({ ...c, hospital: e.target.value }))}
-                />
-              </label>
-            </div>
-            <div className="person-tracker-form-footer">
-              <button className="legacy-button primary-legacy" type="button" onClick={addAwfPerson}>
-                Save
-              </button>
-              <button className="legacy-button" type="button" onClick={() => setShowAwfPersonForm(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+        <PersonTrackerModal
+          draft={awfPersonDraft}
+          updateDraft={(key, value) => setAwfPersonDraft((c) => ({ ...c, [key]: value }))}
+          onSave={addAwfPerson}
+          onClose={() => setShowAwfPersonForm(false)}
+          position={awfPosition}
+          isDragging={isAwfDragging}
+          handleMouseDown={handleAwfMouseDown}
+        />
       )}
     </div>
   )
