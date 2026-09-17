@@ -112,6 +112,8 @@ function PersonTrackerModal({
   position,
   isDragging,
   handleMouseDown,
+  isSaving = false,
+  error = '',
 }) {
   return (
     <div className="person-tracker-overlay">
@@ -140,13 +142,15 @@ function PersonTrackerModal({
             <button
               className="person-tracker-save-btn"
               type="button"
+              disabled={isSaving}
               onClick={onSave}
             >
-              Save
+              {isSaving ? 'Saving...' : 'Save'}
             </button>
             <button
               className="person-tracker-cancel-btn"
               type="button"
+              disabled={isSaving}
               onClick={onClose}
             >
               Cancel
@@ -161,6 +165,23 @@ function PersonTrackerModal({
             </button>
           </div>
         </div>
+
+        {/* Optional Error Banner */}
+        {error && (
+          <div
+            className="person-tracker-modal-error"
+            style={{
+              padding: '6px 14px',
+              backgroundColor: '#fde8e8',
+              color: '#9b1c1c',
+              fontSize: '12px',
+              fontWeight: 500,
+              borderBottom: '1px solid #f8b4b4',
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         {/* Subheader: Entry title & PersonDocLink */}
         <div className="person-tracker-subheader">
@@ -640,13 +661,22 @@ function PersonTrackerModal({
   )
 }
 
-function PersonTracker({ persons, setPersons, readOnly, currentDocControlNumber }) {
+function PersonTracker({
+  persons,
+  setPersons,
+  onSavePerson,
+  onRemovePerson,
+  readOnly,
+  currentDocControlNumber,
+}) {
   const [draft, setDraft] = useState(emptyPerson)
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [isSaving, setIsSaving] = useState(false)
+  const [modalError, setModalError] = useState('')
 
   const handleMouseDown = (e) => {
     if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return
@@ -680,19 +710,52 @@ function PersonTracker({ persons, setPersons, readOnly, currentDocControlNumber 
     }
   }, [isDragging, handleMouseMove, handleMouseUp])
 
-  const updateDraft = (key, value) => setDraft((current) => ({ ...current, [key]: value }))
-
-  const addPerson = () => {
-    if (!draft.firstName && !draft.lastName && !draft.personDocLink && !draft.dataOwner) return
-    setPersons((current) => [...current, draft])
-    setDraft(emptyPerson)
-    setShowForm(false)
+  const updateDraft = (key, value) => {
+    setDraft((current) => ({ ...current, [key]: value }))
+    if (modalError) setModalError('')
   }
 
-  const removePerson = () => {
-    if (selectedIndex === null) return
-    setPersons((current) => current.filter((_, index) => index !== selectedIndex))
-    setSelectedIndex(null)
+  const addPerson = async () => {
+    if (!draft.firstName && !draft.lastName && !draft.personDocLink && !draft.dataOwner) {
+      setModalError('Please enter at least a First Name, Last Name, or PersonDocLink.')
+      return
+    }
+    if (readOnly) {
+      setModalError('Cannot save: document is read-only.')
+      return
+    }
+
+    setIsSaving(true)
+    setModalError('')
+    try {
+      if (onSavePerson) {
+        await onSavePerson(draft)
+      } else if (setPersons) {
+        setPersons((current) => [...current, draft])
+      }
+      setDraft(emptyPerson)
+      setShowForm(false)
+    } catch (err) {
+      setModalError(err.response?.data?.error || err.message || 'Failed to save person to database.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const removePerson = async () => {
+    if (selectedIndex === null || readOnly) return
+    const updated = persons.filter((_, index) => index !== selectedIndex)
+    if (onRemovePerson) {
+      try {
+        await onRemovePerson(updated)
+        setSelectedIndex(null)
+      } catch (err) {
+        console.error('Failed to unlink person:', err)
+      }
+    } else if (setPersons) {
+      setPersons(updated)
+      setSelectedIndex(null)
+    }
   }
 
   return (
@@ -704,6 +767,7 @@ function PersonTracker({ persons, setPersons, readOnly, currentDocControlNumber 
           disabled={readOnly}
           onClick={() => {
             setDraft({ ...emptyPerson, personDocLink: currentDocControlNumber || '' })
+            setModalError('')
             setPosition({ x: 0, y: 0 })
             setShowForm(true)
           }}
@@ -716,6 +780,7 @@ function PersonTracker({ persons, setPersons, readOnly, currentDocControlNumber 
           disabled={readOnly}
           onClick={() => {
             setDraft({ ...emptyPerson, personDocLink: currentDocControlNumber || '' })
+            setModalError('')
             setPosition({ x: 0, y: 0 })
             setShowForm(true)
           }}
@@ -810,6 +875,8 @@ function PersonTracker({ persons, setPersons, readOnly, currentDocControlNumber 
           position={position}
           isDragging={isDragging}
           handleMouseDown={handleMouseDown}
+          isSaving={isSaving}
+          error={modalError}
         />
       )}
     </>
@@ -838,6 +905,8 @@ export default function CodingPage() {
   const [awfPosition, setAwfPosition] = useState({ x: 0, y: 0 })
   const [isAwfDragging, setIsAwfDragging] = useState(false)
   const [awfDragStart, setAwfDragStart] = useState({ x: 0, y: 0 })
+  const [isAwfSaving, setIsAwfSaving] = useState(false)
+  const [awfModalError, setAwfModalError] = useState('')
 
   const handleAwfMouseDown = (e) => {
     if (e.target.tagName === 'BUTTON') return
@@ -975,25 +1044,80 @@ export default function CodingPage() {
     }
   }
 
-  const addAwfPerson = () => {
-    if (!awfPersonDraft.firstName && !awfPersonDraft.lastName && !awfPersonDraft.personDocLink) return
+  // Direct persistence handler for Person Tracker entries
+  const handleSavePersonEntry = async (newPersonDraft) => {
+    if (readOnly) {
+      throw new Error("Cannot edit document belonging to another employee's batch.")
+    }
+    const updatedPersons = [...(coding.persons || []), newPersonDraft]
+    const payload = {
+      ...coding,
+      persons: updatedPersons,
+      reviewerName: 'Current Reviewer',
+    }
+    const { data } = await api.put(`/projects/${activeProjectId}/documents/${routeDocumentId}/coding`, payload)
     setCoding((current) => ({
       ...current,
-      persons: [...(current.persons || []), awfPersonDraft],
+      persons: Array.isArray(data?.persons) ? data.persons : updatedPersons,
     }))
-    setAwfPersonDraft(emptyPerson)
-    setShowAwfPersonForm(false)
-    setSaved(false)
+    setSaved(true)
+    if (data?.batchCompleted) {
+      setIsBatchCompleted(true)
+    }
+    return data
   }
 
-  const removeAwfPerson = () => {
-    if (selectedAwfPersonIndex === null) return
+  const handlePersistUpdatedPersons = async (updatedPersons) => {
+    if (readOnly) return
+    const payload = {
+      ...coding,
+      persons: updatedPersons,
+      reviewerName: 'Current Reviewer',
+    }
+    const { data } = await api.put(`/projects/${activeProjectId}/documents/${routeDocumentId}/coding`, payload)
     setCoding((current) => ({
       ...current,
-      persons: (current.persons || []).filter((_, i) => i !== selectedAwfPersonIndex),
+      persons: Array.isArray(data?.persons) ? data.persons : updatedPersons,
     }))
-    setSelectedAwfPersonIndex(null)
-    setSaved(false)
+    setSaved(true)
+    if (data?.batchCompleted) {
+      setIsBatchCompleted(true)
+    }
+    return data
+  }
+
+  const addAwfPerson = async () => {
+    if (!awfPersonDraft.firstName && !awfPersonDraft.lastName && !awfPersonDraft.personDocLink && !awfPersonDraft.dataOwner) {
+      setAwfModalError('Please enter at least a First Name, Last Name, or PersonDocLink.')
+      return
+    }
+    if (readOnly) {
+      setAwfModalError("Cannot edit document belonging to another employee's batch.")
+      return
+    }
+
+    setIsAwfSaving(true)
+    setAwfModalError('')
+    try {
+      await handleSavePersonEntry(awfPersonDraft)
+      setAwfPersonDraft(emptyPerson)
+      setShowAwfPersonForm(false)
+    } catch (err) {
+      setAwfModalError(err.response?.data?.error || err.message || 'Failed to save person to database.')
+    } finally {
+      setIsAwfSaving(false)
+    }
+  }
+
+  const removeAwfPerson = async () => {
+    if (selectedAwfPersonIndex === null || readOnly) return
+    const updatedPersons = (coding.persons || []).filter((_, i) => i !== selectedAwfPersonIndex)
+    try {
+      await handlePersistUpdatedPersons(updatedPersons)
+      setSelectedAwfPersonIndex(null)
+    } catch (err) {
+      setSaveError(err.response?.data?.error || 'Failed to remove person.')
+    }
   }
 
   // Navigation indices for Previous / Next buttons
@@ -1462,6 +1586,8 @@ export default function CodingPage() {
                   <PersonTracker
                     persons={coding.persons || []}
                     setPersons={updatePersons}
+                    onSavePerson={handleSavePersonEntry}
+                    onRemovePerson={handlePersistUpdatedPersons}
                     readOnly={readOnly}
                     currentDocControlNumber={document?.controlNumber || ''}
                   />
@@ -1495,145 +1621,88 @@ export default function CodingPage() {
                 </Section>
               </div>
             ) : (
-              /* ================= ALTERNATE WORKFLOW LAYOUT ================= */
-              <div>
-                {/* Section 1: Document Information */}
+              /* ALTERNATE WORKFLOW LAYOUT */
+              <div className="coding-awf-layout">
+                {/* Section 1: AL Designation */}
                 <div className="coding-relativity-section">
-                  <div className="coding-relativity-section-header">Document Information</div>
-
-                  <div className="coding-relativity-row">
-                    <div className="coding-relativity-label">Control Number</div>
-                    <div className="coding-relativity-value">{docControlNumber}</div>
-                  </div>
-
-                  <div className="coding-relativity-row">
-                    <div className="coding-relativity-label">File Name</div>
-                    <div className="coding-relativity-value">{docFileName}</div>
+                  <div className="coding-relativity-section-header">AL Designation</div>
+                  <div className="coding-relativity-section-body">
+                    {radioList(
+                      'alDesignation_awf',
+                      ['Relevant', 'Not Relevant', 'Needs 2nd Pass Review'],
+                      coding.alDesignation || 'Relevant',
+                      'alDesignation'
+                    )}
                   </div>
                 </div>
 
-                {/* Section 2: AWF Coding */}
+                {/* Section 2: Alternate Workflow */}
                 <div className="coding-relativity-section">
-                  <div className="coding-relativity-section-header">AWF Coding</div>
-
-                  <div className="coding-relativity-row">
-                    <div className="coding-relativity-label">
-                      Alternate Workflow<br />Complete
-                    </div>
-                    <div className="coding-relativity-value">
-                      <div className="coding-relativity-radios">
-                        {['Yes', 'N/A'].map((option) => (
-                          <label key={option}>
-                            <input
-                              disabled={readOnly}
-                              type="radio"
-                              name="alternateWorkflowComplete"
-                              checked={(coding.alternateWorkflowComplete || 'Yes') === option}
-                              onChange={() => update('alternateWorkflowComplete', option)}
-                            />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="coding-relativity-row">
-                    <div className="coding-relativity-label">
-                      Alternate Workflow<br />Estimate
-                    </div>
-                    <div className="coding-relativity-value">
-                      <div className="coding-relativity-radios">
-                        {['6 - 25 Entries', '26 - 50 Entries', '51 - 150 Entries', '151+ Entries'].map((option) => (
-                          <label key={option}>
-                            <input
-                              disabled={readOnly}
-                              type="radio"
-                              name="alternateWorkflowEstimate"
-                              checked={(coding.alternateWorkflowEstimate || '6 - 25 Entries') === option}
-                              onChange={() => update('alternateWorkflowEstimate', option)}
-                            />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 3: FLR Coding */}
-                <div className="coding-relativity-section">
-                  <div className="coding-relativity-section-header">FLR Coding</div>
-
-                  <div className="coding-relativity-row">
-                    <div className="coding-relativity-label">
-                      Reportable Data<span className="required-star">*</span><br />Found
-                    </div>
-                    <div className="coding-relativity-value">
-                      <div className="coding-relativity-radios">
-                        {[
-                          'Yes',
-                          'No',
-                          'Needs Further Review',
-                          'Technical Issue',
-                          'Password Protected',
-                          'Foreign Language',
-                          'Illegible',
-                          'Duplicate',
-                          'Alternate Workflow 6+ Entries',
-                        ].map((option) => (
-                          <label key={option}>
-                            <input
-                              disabled={readOnly}
-                              type="radio"
-                              name="reportableDataFound"
-                              checked={(coding.reportableDataFound || 'Yes') === option}
-                              onChange={() => update('reportableDataFound', option)}
-                            />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="coding-relativity-row">
-                    <div className="coding-relativity-label">FLR Review Complete</div>
-                    <div className="coding-relativity-value">
-                      {coding.flrComplete || 'Yes'}
-                    </div>
-                  </div>
-
-                  <div className="coding-relativity-row">
-                    <div className="coding-relativity-label">Reviewer Notes</div>
-                    <div className="coding-relativity-value">
-                      <textarea
-                        className="coding-relativity-textarea"
+                  <div className="coding-relativity-section-header">Alternate Workflow</div>
+                  <div className="coding-relativity-section-body">
+                    <div className="coding-field">
+                      <label>Reportable Data Found</label>
+                      <select
                         disabled={readOnly}
-                        value={coding.reviewerNotes || ''}
-                        onChange={(e) => update('reviewerNotes', e.target.value)}
-                      />
+                        value={coding.reportableDataFound || 'Alternate Workflow 6+ Entries'}
+                        onChange={(e) => update('reportableDataFound', e.target.value)}
+                      >
+                        <option>Alternate Workflow 6+ Entries</option>
+                        <option>No</option>
+                        <option>Yes</option>
+                      </select>
+                    </div>
+
+                    <div className="coding-field">
+                      <label>Alternate Workflow Estimate</label>
+                      <select
+                        disabled={readOnly}
+                        value={coding.alternateWorkflowEstimate || '6 - 25 Entries'}
+                        onChange={(e) => update('alternateWorkflowEstimate', e.target.value)}
+                      >
+                        <option>6 - 25 Entries</option>
+                        <option>26 - 100 Entries</option>
+                        <option>100+ Entries</option>
+                      </select>
+                    </div>
+
+                    <div className="coding-field">
+                      <label>Alternate Workflow Complete</label>
+                      <select
+                        disabled={readOnly}
+                        value={coding.alternateWorkflowComplete || 'Yes'}
+                        onChange={(e) => update('alternateWorkflowComplete', e.target.value)}
+                      >
+                        <option>Yes</option>
+                        <option>No</option>
+                      </select>
+                    </div>
+
+                    <div className="coding-field">
+                      <label>AWF Extraction Completed</label>
+                      <select
+                        disabled={readOnly}
+                        value={coding.awfExtractionCompleted || 'Yes'}
+                        onChange={(e) => update('awfExtractionCompleted', e.target.value)}
+                      >
+                        <option>Yes</option>
+                        <option>No</option>
+                      </select>
                     </div>
                   </div>
+                </div>
 
-                  <div className="coding-relativity-row">
-                    <div className="coding-relativity-label">
-                      AWF Extraction<br />Completed
-                    </div>
-                    <div className="coding-relativity-value">
-                      <div className="coding-relativity-radios">
-                        <label>
-                          <input
-                            disabled={readOnly}
-                            type="radio"
-                            name="awfExtractionCompleted"
-                            checked={(coding.awfExtractionCompleted || 'Yes') === 'Yes'}
-                            onChange={() => update('awfExtractionCompleted', 'Yes')}
-                          />
-                          <span>Yes</span>
-                        </label>
-                      </div>
-                    </div>
+                {/* Section 3: Reviewer Notes */}
+                <div className="coding-relativity-section">
+                  <div className="coding-relativity-section-header">Reviewer Notes</div>
+                  <div className="coding-relativity-section-body">
+                    <textarea
+                      className="coding-notes"
+                      disabled={readOnly}
+                      value={coding.reviewerNotes || ''}
+                      onChange={(e) => update('reviewerNotes', e.target.value)}
+                      placeholder="Reviewer Notes"
+                    />
                   </div>
                 </div>
 
@@ -1648,6 +1717,7 @@ export default function CodingPage() {
                         disabled={readOnly}
                         onClick={() => {
                           setAwfPersonDraft({ ...emptyPerson, personDocLink: document?.controlNumber || '' })
+                          setAwfModalError('')
                           setAwfPosition({ x: 0, y: 0 })
                           setShowAwfPersonForm(true)
                         }}
@@ -1660,6 +1730,7 @@ export default function CodingPage() {
                         disabled={readOnly}
                         onClick={() => {
                           setAwfPersonDraft({ ...emptyPerson, personDocLink: document?.controlNumber || '' })
+                          setAwfModalError('')
                           setAwfPosition({ x: 0, y: 0 })
                           setShowAwfPersonForm(true)
                         }}
@@ -1758,12 +1829,17 @@ export default function CodingPage() {
       {showAwfPersonForm && (
         <PersonTrackerModal
           draft={awfPersonDraft}
-          updateDraft={(key, value) => setAwfPersonDraft((c) => ({ ...c, [key]: value }))}
+          updateDraft={(key, value) => {
+            setAwfPersonDraft((c) => ({ ...c, [key]: value }))
+            if (awfModalError) setAwfModalError('')
+          }}
           onSave={addAwfPerson}
           onClose={() => setShowAwfPersonForm(false)}
           position={awfPosition}
           isDragging={isAwfDragging}
           handleMouseDown={handleAwfMouseDown}
+          isSaving={isAwfSaving}
+          error={awfModalError}
         />
       )}
     </div>
