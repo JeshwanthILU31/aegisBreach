@@ -1,6 +1,7 @@
 import Batch from '../models/Batch.js'
 import Document from '../models/Document.js'
 import Coding from '../models/Coding.js'
+import { deleteAssetFromCloudinary } from './cloudinaryService.js'
 
 export async function getBatchesByProjectId(projectId, filters = {}) {
   const query = { projectId }
