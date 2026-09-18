@@ -35,3 +35,23 @@ export async function login(request, response) {
   }
 }
 
+export async function changePassword(request, response) {
+  try {
+    const userId = request.user?.userId
+    if (!userId) {
+      return response.status(401).json({ error: 'Authentication required' })
+    }
+    const { currentPassword, newPassword } = request.body || {}
+    const result = await authService.changePassword({ userId, currentPassword, newPassword })
+    response.status(200).json(result)
+  } catch (error) {
+    if (error.status) {
+      return response.status(error.status).json({ error: error.message })
+    }
+    if (error.name === 'ValidationError') {
+      return response.status(400).json({ error: error.message })
+    }
+    response.status(500).json({ error: error.message || 'Internal server error' })
+  }
+}
+

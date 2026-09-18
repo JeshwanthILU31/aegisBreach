@@ -1,12 +1,26 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { loginUser as loginApi } from '../services/authApi'
 
-const TOKEN_KEY = 'aegisbreach_token'
-const USER_KEY = 'aegisbreach_user'
+export const TOKEN_KEY = 'aegisbreach_token'
+export const USER_KEY = 'aegisbreach_user'
+export const IDLE_TIMEOUT_MS = 60 * 60 * 1000 // 1 hour in milliseconds
+
+export const ACTIVITY_EVENTS = [
+  'mousemove',
+  'mousedown',
+  'click',
+  'keydown',
+  'scroll',
+  'touchstart',
+  'touchmove',
+  'wheel',
+]
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
+  const navigate = useNavigate()
   const [token, setToken] = useState(() => {
     try {
       return localStorage.getItem(TOKEN_KEY) || null
@@ -37,13 +51,14 @@ export function AuthProvider({ children }) {
       try {
         localStorage.removeItem(USER_KEY)
         localStorage.removeItem(TOKEN_KEY)
-      } catch {}
+      } catch { }
       return null
     }
   })
 
   const [authNotice, setAuthNotice] = useState(null)
   const isAuthenticated = Boolean(token && user)
+  const timerRef = useRef(null)
 
   function showAuthNotice(message, duration = 3500) {
     setAuthNotice(message)
@@ -51,6 +66,71 @@ export function AuthProvider({ children }) {
       setAuthNotice(null)
     }, duration)
   }
+
+  const handleIdleTimeout = useCallback(() => {
+    try {
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
+    } catch (err) {
+      console.error('Failed to remove auth state from storage', err)
+    }
+    setToken(null)
+    setUser(null)
+    showAuthNotice('You have been logged out due to inactivity.')
+    if (typeof navigate === 'function') {
+      navigate('/login')
+    }
+  }, [navigate])
+
+  // Inactivity / Idle Timeout Lifecycle
+  useEffect(() => {
+    if (!isAuthenticated) {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+      return
+    }
+
+    const resetTimer = () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+      timerRef.current = setTimeout(handleIdleTimeout, IDLE_TIMEOUT_MS)
+    }
+
+    let lastActivityTime = Date.now()
+    const onActivity = () => {
+      const now = Date.now()
+      // Throttle timer resetting to prevent overhead from high-frequency events (e.g. mousemove/scroll)
+      if (now - lastActivityTime > 500) {
+        lastActivityTime = now
+        resetTimer()
+      }
+    }
+
+    // Start timer upon authentication
+    resetTimer()
+
+    // Register user activity listeners
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      ACTIVITY_EVENTS.forEach((event) => {
+        window.addEventListener(event, onActivity, { passive: true })
+      })
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+      if (typeof window !== 'undefined' && window.removeEventListener) {
+        ACTIVITY_EVENTS.forEach((event) => {
+          window.removeEventListener(event, onActivity)
+        })
+      }
+    }
+  }, [isAuthenticated, handleIdleTimeout])
 
   async function login(identifier, password) {
     const data = await loginApi({ identifier, password })
@@ -80,7 +160,11 @@ export function AuthProvider({ children }) {
     return { ...data, token: receivedToken, user: safeUser }
   }
 
-  function logout() {
+  function logout(notice = null) {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
     try {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
@@ -89,7 +173,11 @@ export function AuthProvider({ children }) {
     }
     setToken(null)
     setUser(null)
-    setAuthNotice(null)
+    if (notice) {
+      showAuthNotice(notice)
+    } else {
+      setAuthNotice(null)
+    }
   }
 
   return (
@@ -102,6 +190,7 @@ export function AuthProvider({ children }) {
         showAuthNotice,
         login,
         logout,
+        handleIdleTimeout,
       }}
     >
       {children}

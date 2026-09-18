@@ -4,6 +4,7 @@ import * as documentsApi from '../../services/documentsApi'
 import * as batchesApi from '../../services/batchesApi'
 import * as projectsApi from '../../services/projectsApi'
 import { useAuth } from '../../context/AuthContext'
+import ChangePasswordModal from './ChangePasswordModal'
 
 const MAX_FILE_SIZE_BYTES = 30 * 1024 * 1024 // 30 MB
 const ALLOWED_EXTENSIONS = [
@@ -93,6 +94,7 @@ export default function AdminDocumentsPage() {
   const [bulkRows, setBulkRows] = useState([createEmptyBulkRow(), createEmptyBulkRow(), createEmptyBulkRow()])
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
 
   // Load project, batch, and documents
   const loadData = useCallback(async () => {
@@ -471,6 +473,15 @@ export default function AdminDocumentsPage() {
             <span className="user-avatar" style={{ background: '#7c3aed' }}>AD</span>
             <span>Admin</span>
           </div>
+          <button
+            className="legacy-button"
+            type="button"
+            onClick={() => setIsPasswordModalOpen(true)}
+            style={{ color: '#e2e8f0', background: '#374151', border: '1px solid #4b5563', fontSize: '11px', padding: '4px 10px' }}
+            title="Change your account password"
+          >
+            Change Password
+          </button>
           <button
             className="logout-button"
             type="button"
@@ -1182,6 +1193,12 @@ export default function AdminDocumentsPage() {
           </div>
         </div>
       )}
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+      />
     </div>
   )
 }

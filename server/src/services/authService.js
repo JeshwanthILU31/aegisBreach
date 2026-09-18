@@ -142,3 +142,48 @@ export async function loginUser({ identifier, password }) {
     },
   }
 }
+
+export async function changePassword({ userId, currentPassword, newPassword }) {
+  if (!currentPassword || typeof currentPassword !== 'string' || !currentPassword.trim()) {
+    const err = new Error('Current password is required')
+    err.status = 400
+    throw err
+  }
+
+  if (!newPassword || typeof newPassword !== 'string') {
+    const err = new Error('New password is required')
+    err.status = 400
+    throw err
+  }
+
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    const err = new Error(`New password must be at least ${MIN_PASSWORD_LENGTH} characters long`)
+    err.status = 400
+    throw err
+  }
+
+  if (currentPassword === newPassword) {
+    const err = new Error('New password must be different from current password')
+    err.status = 400
+    throw err
+  }
+
+  const user = await User.findById(userId).select('+password')
+  if (!user) {
+    const err = new Error('User not found')
+    err.status = 404
+    throw err
+  }
+
+  const isMatch = await user.comparePassword(currentPassword)
+  if (!isMatch) {
+    const err = new Error('Invalid current password')
+    err.status = 401
+    throw err
+  }
+
+  user.password = newPassword
+  await user.save()
+
+  return { message: 'Password changed successfully' }
+}

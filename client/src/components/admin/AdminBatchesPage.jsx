@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import * as batchesApi from '../../services/batchesApi'
 import * as projectsApi from '../../services/projectsApi'
 import { useAuth } from '../../context/AuthContext'
+import ChangePasswordModal from './ChangePasswordModal'
 
 const emptyBatchForm = {
   name: '',
@@ -49,6 +50,7 @@ export default function AdminBatchesPage() {
   const [formData, setFormData] = useState(emptyBatchForm)
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
 
   // Fetch Project & Batches
   const loadData = useCallback(async () => {
@@ -231,6 +233,15 @@ export default function AdminBatchesPage() {
             <span className="user-avatar" style={{ background: '#7c3aed' }}>AD</span>
             <span>Admin</span>
           </div>
+          <button
+            className="legacy-button"
+            type="button"
+            onClick={() => setIsPasswordModalOpen(true)}
+            style={{ color: '#e2e8f0', background: '#374151', border: '1px solid #4b5563', fontSize: '11px', padding: '4px 10px' }}
+            title="Change your account password"
+          >
+            Change Password
+          </button>
           <button
             className="logout-button"
             type="button"
@@ -660,6 +671,12 @@ export default function AdminBatchesPage() {
           </div>
         </div>
       )}
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+      />
     </div>
   )
 }
