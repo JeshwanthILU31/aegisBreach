@@ -6,8 +6,8 @@ export default function Login() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [formData, setFormData] = useState({
-    identifier: '',
-    password: '',
+    identifier: 'user1',
+    password: '12345678',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)

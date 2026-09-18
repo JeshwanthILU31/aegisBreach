@@ -296,13 +296,6 @@ function PersonTrackerModal({
                   value={draft.country || ''}
                   onChange={(e) => updateDraft('country', e.target.value)}
                 />
-                <button
-                  type="button"
-                  className="person-tracker-select-btn"
-                  onClick={() => updateDraft('country', draft.country || 'USA')}
-                >
-                  Select
-                </button>
               </div>
             </div>
 
@@ -465,17 +458,10 @@ function PersonTrackerModal({
             <div className="person-tracker-row">
               <label className="person-tracker-label">State</label>
               <div className="person-tracker-control">
-                <select
+                <input
                   value={draft.state || ''}
                   onChange={(e) => updateDraft('state', e.target.value)}
-                >
-                  <option value="">Choose...</option>
-                  {US_STATES.map((st) => (
-                    <option key={st} value={st}>
-                      {st}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
 
@@ -547,13 +533,6 @@ function PersonTrackerModal({
                   value={draft.passportIssuingCountry || ''}
                   onChange={(e) => updateDraft('passportIssuingCountry', e.target.value)}
                 />
-                <button
-                  type="button"
-                  className="person-tracker-select-btn"
-                  onClick={() => updateDraft('passportIssuingCountry', draft.passportIssuingCountry || 'USA')}
-                >
-                  Select
-                </button>
               </div>
             </div>
 
@@ -571,17 +550,10 @@ function PersonTrackerModal({
             <div className="person-tracker-row">
               <label className="person-tracker-label">DL State</label>
               <div className="person-tracker-control">
-                <select
+                <input
                   value={draft.dlState || ''}
                   onChange={(e) => updateDraft('dlState', e.target.value)}
-                >
-                  <option value="">Choose...</option>
-                  {US_STATES.map((st) => (
-                    <option key={st} value={st}>
-                      {st}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
 

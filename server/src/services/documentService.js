@@ -383,7 +383,7 @@ export async function uploadDocumentFile(projectIdOrSlug, batchId, documentId, f
   // Determine resource type for Cloudinary
   const ext = path.extname(file.originalname || '').toLowerCase()
   let resourceType = 'auto'
-  if (['.doc', '.docx', '.xls', '.xlsx', '.pptx', '.csv'].includes(ext)) {
+  if (['.doc', '.docx', '.xls', '.xlsx', '.pptx', '.csv', '.txt'].includes(ext)) {
     resourceType = 'raw'
   }
 
@@ -393,12 +393,23 @@ export async function uploadDocumentFile(projectIdOrSlug, batchId, documentId, f
       folder,
       publicId,
       resourceType,
+      format: ext.replace('.', ''),
     })
   } catch (err) {
     const error = new Error(err.message || 'Failed to upload file to Cloudinary')
     error.status = 502
     throw error
   }
+
+  // Derive concrete resource type (never persist 'auto')
+  const concreteResourceType =
+    uploadResult.resource_type && uploadResult.resource_type !== 'auto'
+      ? uploadResult.resource_type
+      : ['.doc', '.docx', '.xls', '.xlsx', '.pptx', '.csv', '.txt'].includes(ext)
+      ? 'raw'
+      : 'image'
+
+  const concreteFormat = uploadResult.format || ext.replace('.', '')
 
   try {
     const updatedDoc = await Document.findByIdAndUpdate(
@@ -407,8 +418,8 @@ export async function uploadDocumentFile(projectIdOrSlug, batchId, documentId, f
         $set: {
           fileUrl: uploadResult.secure_url,
           cloudinaryPublicId: uploadResult.public_id,
-          resourceType: uploadResult.resource_type || resourceType,
-          format: uploadResult.format || ext.replace('.', ''),
+          resourceType: concreteResourceType,
+          format: concreteFormat,
           fileName: file.originalname,
           fileSize: formatFileSize(file.size),
         },

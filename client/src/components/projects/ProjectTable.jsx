@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom'
+import { Pin } from 'lucide-react'
 
 export default function ProjectTable({
   projects = [],
   loading = false,
   filters = {},
   onFilterChange = () => {},
+  pinnedIds = [],
+  onTogglePin = () => {},
 }) {
   return (
     <div className="data-table-wrap">
@@ -94,13 +97,32 @@ export default function ProjectTable({
           ) : (
             projects.map((project, index) => {
               const projectKey = project.slug || project._id || project.id
+              const stableId = String(project._id || project.id || project.slug)
+              const isPinned = pinnedIds.includes(stableId)
               const artifactId = project.caseArtifactId || (project._id ? parseInt(project._id.slice(-6), 16) : 11420698 + index)
               return (
-                <tr key={projectKey}>
+                <tr key={projectKey} className={isPinned ? 'is-pinned-row' : ''}>
                   <td className="row-number">{index + 1}</td>
                   <td className="check-column"><input type="checkbox" aria-label={`Select ${project.name}`} /></td>
                   <td className="artifact-id">{artifactId}</td>
-                  <td><button className="pin-button" type="button" aria-label={`Pin ${project.name}`}>*</button></td>
+                  <td>
+                    <button
+                      className={`pin-button ${isPinned ? 'is-pinned' : ''}`}
+                      type="button"
+                      aria-label={isPinned ? `Unpin ${project.name}` : `Pin ${project.name}`}
+                      title={isPinned ? `Unpin ${project.name}` : `Pin ${project.name}`}
+                      onClick={() => onTogglePin(stableId)}
+                    >
+                      <Pin
+                        size={12}
+                        style={{
+                          transform: isPinned ? 'rotate(-30deg)' : 'none',
+                          fill: isPinned ? '#2e648e' : 'none',
+                          color: isPinned ? '#2e648e' : '#8c9ba5',
+                        }}
+                      />
+                    </button>
+                  </td>
                   <td>
                     <Link className="table-link" to={`/projects/${projectKey}`}>
                       {project.name}
