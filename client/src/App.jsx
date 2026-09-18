@@ -4,6 +4,7 @@ import AdminProjectsPage from './components/admin/AdminProjectsPage'
 import AdminBatchesPage from './components/admin/AdminBatchesPage'
 import AdminDocumentsPage from './components/admin/AdminDocumentsPage'
 import AdminRoute from './routes/AdminRoute'
+import ProtectedRoute from './routes/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
 
 function NotFoundPage() {
@@ -29,46 +30,60 @@ function App() {
         </div>
       )}
       <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/projects" element={<Projects />} />
+        <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <Projects />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/admin"
-        element={
-          <AdminRoute>
-            <AdminProjectsPage />
-          </AdminRoute>
-        }
-      />
-      <Route
-        path="/admin/projects"
-        element={
-          <AdminRoute>
-            <AdminProjectsPage />
-          </AdminRoute>
-        }
-      />
-      <Route
-        path="/admin/projects/:projectId/batches"
-        element={
-          <AdminRoute>
-            <AdminBatchesPage />
-          </AdminRoute>
-        }
-      />
-      <Route
-        path="/admin/projects/:projectId/batches/:batchId/documents"
-        element={
-          <AdminRoute>
-            <AdminDocumentsPage />
-          </AdminRoute>
-        }
-      />
-      <Route path="/projects/:projectId/*" element={<ProjectWorkspace />} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminProjectsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/projects"
+          element={
+            <AdminRoute>
+              <AdminProjectsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/projects/:projectId/batches"
+          element={
+            <AdminRoute>
+              <AdminBatchesPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/projects/:projectId/batches/:batchId/documents"
+          element={
+            <AdminRoute>
+              <AdminDocumentsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId/*"
+          element={
+            <ProtectedRoute>
+              <ProjectWorkspace />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
     </>
   )
 }

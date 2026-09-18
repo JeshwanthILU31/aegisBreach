@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import api from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 
 const defaultCoding = {
   alDesignation: 'Relevant',
@@ -884,6 +885,7 @@ function PersonTracker({
 }
 
 export default function CodingPage() {
+  const { user } = useAuth()
   const { projectId } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -892,6 +894,7 @@ export default function CodingPage() {
   const [document, setDocument] = useState(null)
   const [activeBatchDocs, setActiveBatchDocs] = useState([])
   const [coding, setCoding] = useState(defaultCoding)
+  const [serverReadOnly, setServerReadOnly] = useState(null)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [isBatchCompleted, setIsBatchCompleted] = useState(false)
@@ -960,7 +963,7 @@ export default function CodingPage() {
 
       // Fetch active batch documents for navigation
       const batchDocsRes = await api.get(`/projects/${activeProjectId}/documents`, {
-        params: { view: 'My Batched Out Docs', reviewerName: 'Current Reviewer' },
+        params: { view: 'My Batched Out Docs' },
       })
       if (Array.isArray(batchDocsRes.data)) {
         setActiveBatchDocs(batchDocsRes.data)
@@ -973,6 +976,9 @@ export default function CodingPage() {
           ...codingRes.data,
           persons: Array.isArray(codingRes.data.persons) ? codingRes.data.persons : [],
         })
+        if (typeof codingRes.data.readOnly === 'boolean') {
+          setServerReadOnly(codingRes.data.readOnly)
+        }
       }
     } catch (error) {
       setSaveError(error.response?.data?.error || 'Failed to load document coding.')
@@ -985,13 +991,20 @@ export default function CodingPage() {
 
   // Ownership resolution
   const batch = document?.batchId
-  const isAssignedToMe = Boolean(
+  const isAdmin = user?.role === 'admin'
+  const isBatchActiveAndLocked = Boolean(batch && batch.isLocked && batch.status === 'In Progress')
+  const isBatchOwner = Boolean(
+    user &&
     batch &&
-    batch.assignedToName === 'Current Reviewer' &&
-    batch.isLocked &&
-    batch.status === 'In Progress'
+    (
+      (user.id && batch.lockedBy && String(batch.lockedBy) === String(user.id)) ||
+      (user.id && batch.assignedTo && String(batch.assignedTo) === String(user.id)) ||
+      (user.username && batch.assignedToName && batch.assignedToName === user.username)
+    )
   )
-  const readOnly = !isAssignedToMe
+
+  const isAssignedToMe = isAdmin || (isBatchActiveAndLocked && isBatchOwner)
+  const readOnly = isAdmin ? false : (serverReadOnly !== null ? serverReadOnly : !isAssignedToMe)
 
   const update = (key, value) => {
     setCoding((current) => ({ ...current, [key]: value }))
@@ -1013,7 +1026,6 @@ export default function CodingPage() {
     try {
       const { data } = await api.put(`/projects/${activeProjectId}/documents/${routeDocumentId}/coding`, {
         ...coding,
-        reviewerName: 'Current Reviewer',
       })
 
       setSaved(true)
@@ -1053,7 +1065,6 @@ export default function CodingPage() {
     const payload = {
       ...coding,
       persons: updatedPersons,
-      reviewerName: 'Current Reviewer',
     }
     const { data } = await api.put(`/projects/${activeProjectId}/documents/${routeDocumentId}/coding`, payload)
     setCoding((current) => ({
@@ -1072,7 +1083,6 @@ export default function CodingPage() {
     const payload = {
       ...coding,
       persons: updatedPersons,
-      reviewerName: 'Current Reviewer',
     }
     const { data } = await api.put(`/projects/${activeProjectId}/documents/${routeDocumentId}/coding`, payload)
     setCoding((current) => ({

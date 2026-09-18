@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 
 const initialFilters = { batchSet: 'All', batch: '', batchStatus: 'All', batchUnit: 'All', assignedTo: 'All' }
 
-function ReviewTable({ rows, filters, setFilters, selected, setSelected, onOpen }) {
+function ReviewTable({ rows, filters, setFilters, selected, setSelected, onOpen, user }) {
   const selectableRows = rows.filter((row) => !row.takenByOther && !row.isLocked)
   const allSelected = selectableRows.length > 0 && selectableRows.every((row) => selected.includes(row.id))
   const toggleAll = (event) => setSelected(event.target.checked ? selectableRows.map((row) => row.id) : [])
@@ -62,7 +63,7 @@ function ReviewTable({ rows, filters, setFilters, selected, setSelected, onOpen 
               <select value={filters.assignedTo} onChange={(event) => update('assignedTo', event.target.value)} aria-label="Filter assigned reviewer">
                 <option>All</option>
                 <option>Unassigned</option>
-                <option>Current Reviewer</option>
+                {user?.username && <option>{user.username}</option>}
                 <option>Employee A (Gupta, Anjali)</option>
                 <option>Employee B (Saini, Suresh)</option>
               </select>
@@ -110,6 +111,7 @@ function ReviewTable({ rows, filters, setFilters, selected, setSelected, onOpen 
 }
 
 export default function ReviewPage() {
+  const { user } = useAuth()
   const { projectId } = useParams()
   const navigate = useNavigate()
   const [projectView, setProjectView] = useState('Project Orchid (6-7)')
@@ -129,8 +131,16 @@ export default function ReviewPage() {
       const { data } = await api.get(`/projects/${activeProjectId}/batches`)
       if (Array.isArray(data)) {
         const mapped = data.map((item) => {
-          const isTakenByOther = Boolean(item.isLocked && item.assignedToName && item.assignedToName !== 'Current Reviewer')
-          const isTakenByMe = Boolean(item.isLocked && item.assignedToName === 'Current Reviewer')
+          const isTakenByMe = Boolean(
+            item.isLocked &&
+            user &&
+            (
+              (item.lockedBy && String(item.lockedBy) === String(user.id)) ||
+              (item.assignedTo && String(item.assignedTo) === String(user.id)) ||
+              (item.assignedToName && user.username && item.assignedToName === user.username)
+            )
+          )
+          const isTakenByOther = Boolean(item.isLocked && !isTakenByMe)
           let displayStatus = item.status || 'Available'
           if (isTakenByOther) displayStatus = 'Taken'
           else if (isTakenByMe) displayStatus = 'In Progress'
@@ -142,9 +152,13 @@ export default function ReviewPage() {
             batchStatus: displayStatus,
             batchUnit: item.batchUnit || 'Alternate Workflow 6+ Entries',
             assignedTo: item.assignedToName || '',
+            assignedToName: item.assignedToName || '',
+            lockedBy: item.lockedBy,
+            assignedToId: item.assignedTo,
             reviewed: item.reviewed || 0,
             batchSize: item.batchSize || 50,
             takenByOther: isTakenByOther,
+            isTakenByMe: isTakenByMe,
             isLocked: Boolean(item.isLocked),
           }
         })
@@ -153,7 +167,7 @@ export default function ReviewPage() {
     } catch {
       // Backend error fallback
     }
-  }, [projectId])
+  }, [projectId, user])
 
   useEffect(() => {
     fetchBatches()
@@ -174,7 +188,7 @@ export default function ReviewPage() {
     })
   }, [appliedSearch, batchSet, dbBatches, filters])
 
-  const acquiredCount = useMemo(() => dbBatches.filter((b) => b.isLocked && b.assignedTo === 'Current Reviewer').length, [dbBatches])
+  const acquiredCount = useMemo(() => dbBatches.filter((b) => b.isLocked && b.isTakenByMe).length, [dbBatches])
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize)
 
@@ -200,7 +214,7 @@ export default function ReviewPage() {
 
     for (const batchId of selected) {
       try {
-        await api.post(`/batches/${batchId}/acquire`, { reviewerName: 'Current Reviewer' })
+        await api.post(`/batches/${batchId}/acquire`)
       } catch (error) {
         hadError = true
         const errorMessage = error.response?.data?.error || 'Batch could not be acquired.'
@@ -269,7 +283,7 @@ export default function ReviewPage() {
         <span>{selected.length} selected / {rows.length} records / {acquiredCount} batched out</span>
       </div>
 
-      <ReviewTable rows={pageRows} filters={filters} setFilters={setFilters} selected={selected} setSelected={setSelected} onOpen={openBatch} />
+      <ReviewTable rows={pageRows} filters={filters} setFilters={setFilters} selected={selected} setSelected={setSelected} onOpen={openBatch} user={user} />
 
       <div className="review-pagination">
         <span>Showing {rows.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, rows.length)} of {rows.length}</span>
