@@ -49,6 +49,10 @@ const personSchema = new mongoose.Schema({
   dataOwner: { type: String, default: '' },
   role: { type: String, default: '' },
   hospital: { type: String, default: '' },
+  createdBy: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+  updatedBy: { type: String, default: '' },
+  updatedAt: { type: Date, default: Date.now },
 }, { _id: false, strict: false })
 
 const codingSchema = new mongoose.Schema({

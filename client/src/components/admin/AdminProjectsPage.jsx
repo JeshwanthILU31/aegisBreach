@@ -183,9 +183,34 @@ export default function AdminProjectsPage() {
           <span className="relativity-mark" style={{ background: '#7c3aed' }}>A</span>
           <span>AegisBreach Admin</span>
         </Link>
-        <div style={{ marginLeft: '16px', color: '#c4cdd5', fontSize: '12px' }}>
-          Project &amp; Workspace Management
-        </div>
+        <nav style={{ marginLeft: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Link
+            to="/admin/projects"
+            style={{
+              color: '#fff',
+              background: '#374151',
+              padding: '4px 10px',
+              borderRadius: '3px',
+              textDecoration: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Workspaces &amp; Projects
+          </Link>
+          <Link
+            to="/admin/person-tracker"
+            style={{
+              color: '#cbd5e1',
+              padding: '4px 10px',
+              borderRadius: '3px',
+              textDecoration: 'none',
+              fontSize: '12px',
+            }}
+          >
+            Person Tracker
+          </Link>
+        </nav>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Link
             className="legacy-button"

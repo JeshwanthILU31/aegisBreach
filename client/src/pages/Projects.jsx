@@ -208,6 +208,16 @@ export default function Projects() {
         </Link>
         <div className="workspace-picker"><span className="picker-search">x</span><select aria-label="Workspace list"><option>T048ap Workspaces</option></select></div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {user?.role === 'admin' && (
+            <Link
+              to="/admin"
+              className="legacy-button"
+              style={{ textDecoration: 'none', color: '#fff', background: '#7c3aed', border: '1px solid #6d28d9', fontSize: '11px', padding: '4px 10px' }}
+              title="Open Admin Management"
+            >
+              Admin Portal
+            </Link>
+          )}
           <div className="selection-user">
             <span className="user-avatar">{initials}</span>
             <span>{username}</span>

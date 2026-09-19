@@ -7,6 +7,7 @@ import healthRoutes from './routes/healthRoutes.js'
 import projectRoutes from './routes/projectRoutes.js'
 import userRoutes from './routes/userRoutes.js'
 import authRoutes from './routes/authRoutes.js'
+import adminRoutes from './routes/adminRoutes.js'
 import { acquireBatch, completeBatch } from './controllers/batchController.js'
 import { uploadDocumentFile } from './controllers/documentController.js'
 import { validateObjectId, validateIdOrSlug } from './middleware/validateObjectId.js'
@@ -22,6 +23,7 @@ app.use(express.json())
 
 app.use('/api/health', healthRoutes)
 app.use('/api/auth', authRoutes)
+app.use('/api/admin', adminRoutes)
 app.use('/api/projects', projectRoutes)
 app.use('/api/projects/:projectId/batches', batchRoutes)
 app.post('/api/batches/:batchId/acquire', authenticate, validateObjectId('batchId'), acquireBatch)

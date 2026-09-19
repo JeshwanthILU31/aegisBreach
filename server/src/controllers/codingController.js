@@ -147,6 +147,51 @@ export async function saveCoding(request, response) {
       documentId: document.controlNumber,
     }
 
+    const existingCoding = await Coding.findOne({
+      projectId: document.projectId.toString(),
+      documentId: document.controlNumber,
+    }).lean()
+
+    const existingPersonsMap = new Map()
+    if (existingCoding && Array.isArray(existingCoding.persons)) {
+      for (const p of existingCoding.persons) {
+        if (p._id) {
+          existingPersonsMap.set(String(p._id), p)
+        }
+      }
+    }
+
+    const now = new Date()
+
+    if (Array.isArray(payload.persons)) {
+      payload.persons = payload.persons.map((p) => {
+        const targetId = p._id ? String(p._id) : null
+        const existingPerson = targetId ? existingPersonsMap.get(targetId) : null
+
+        if (existingPerson) {
+          // EDIT: Preserve stable _id, createdBy, and createdAt; update updatedBy & updatedAt to authenticated reviewer
+          return {
+            ...p,
+            _id: existingPerson._id || targetId,
+            createdBy: existingPerson.createdBy || p.createdBy || reviewerName,
+            createdAt: existingPerson.createdAt || p.createdAt || now,
+            updatedBy: reviewerName,
+            updatedAt: now,
+          }
+        } else {
+          // CREATE: Generate stable _id if missing; set authoritative createdBy/createdAt & updatedBy/updatedAt
+          return {
+            ...p,
+            _id: p._id || new mongoose.Types.ObjectId().toString(),
+            createdBy: reviewerName,
+            createdAt: now,
+            updatedBy: reviewerName,
+            updatedAt: now,
+          }
+        }
+      })
+    }
+
     // Remove client-spoofed identities
     delete payload.reviewerName
     delete payload.userId

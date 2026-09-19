@@ -117,12 +117,13 @@ function PersonTrackerModal({
   error = '',
 }) {
   return (
-    <div className="person-tracker-overlay">
+    <div className="person-tracker-overlay-floating">
       <div
         className="person-tracker-entry-window"
         role="dialog"
         aria-modal="true"
         aria-labelledby="person-tracker-title"
+        onMouseDown={handleMouseDown}
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
           cursor: isDragging ? 'grabbing' : 'default',
@@ -131,8 +132,7 @@ function PersonTrackerModal({
         {/* Top Header Bar matching Relativity layout */}
         <div
           className="person-tracker-topbar"
-          onMouseDown={handleMouseDown}
-          style={{ cursor: 'grab', userSelect: 'none' }}
+          style={{ cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}
         >
           <div className="person-tracker-topbar-left">
             <span className="person-tracker-layout-badge">
@@ -643,6 +643,7 @@ function PersonTracker({
   currentDocControlNumber,
 }) {
   const [draft, setDraft] = useState(emptyPerson)
+  const [editingPersonId, setEditingPersonId] = useState(null)
   const [selectedIndex, setSelectedIndex] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0 })
@@ -652,7 +653,16 @@ function PersonTracker({
   const [modalError, setModalError] = useState('')
 
   const handleMouseDown = (e) => {
-    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return
+    if (
+      e.target.closest('input, textarea, select, button, a, [role="button"]') ||
+      e.target.tagName === 'BUTTON' ||
+      e.target.tagName === 'INPUT' ||
+      e.target.tagName === 'TEXTAREA' ||
+      e.target.tagName === 'SELECT' ||
+      e.target.tagName === 'A'
+    ) {
+      return
+    }
     setIsDragging(true)
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
   }
@@ -684,7 +694,17 @@ function PersonTracker({
   }, [isDragging, handleMouseMove, handleMouseUp])
 
   const updateDraft = (key, value) => {
-    setDraft((current) => ({ ...current, [key]: value }))
+    setDraft((current) => {
+      const updated = { ...current, [key]: value }
+      if (editingPersonId && setPersons) {
+        setPersons((prevList) =>
+          prevList.map((p) =>
+            (p._id && String(p._id) === String(editingPersonId)) ? { ...p, [key]: value } : p
+          )
+        )
+      }
+      return updated
+    })
     if (modalError) setModalError('')
   }
 
@@ -702,11 +722,22 @@ function PersonTracker({
     setModalError('')
     try {
       if (onSavePerson) {
-        await onSavePerson(draft)
+        await onSavePerson(draft, editingPersonId)
       } else if (setPersons) {
-        setPersons((current) => [...current, draft])
+        setPersons((current) => {
+          if (editingPersonId) {
+            const idx = current.findIndex((p) => p._id && String(p._id) === String(editingPersonId))
+            if (idx !== -1) {
+              const copy = [...current]
+              copy[idx] = { ...copy[idx], ...draft, _id: editingPersonId }
+              return copy
+            }
+          }
+          return [...current, { ...draft, _id: draft._id || `p_${Date.now()}` }]
+        })
       }
       setDraft(emptyPerson)
+      setEditingPersonId(null)
       setShowForm(false)
     } catch (err) {
       setModalError(err.response?.data?.error || err.message || 'Failed to save person to database.')
@@ -722,12 +753,37 @@ function PersonTracker({
       try {
         await onRemovePerson(updated)
         setSelectedIndex(null)
+        setEditingPersonId(null)
+        setDraft(emptyPerson)
       } catch (err) {
         console.error('Failed to unlink person:', err)
       }
     } else if (setPersons) {
       setPersons(updated)
       setSelectedIndex(null)
+      setEditingPersonId(null)
+      setDraft(emptyPerson)
+    }
+  }
+
+  const handleSelectPerson = (index) => {
+    setSelectedIndex(index)
+    const person = persons[index]
+    if (person) {
+      setDraft({ ...emptyPerson, ...person })
+      setEditingPersonId(person._id || null)
+    }
+  }
+
+  const handleOpenEditPerson = (index) => {
+    setSelectedIndex(index)
+    const person = persons[index]
+    if (person) {
+      setDraft({ ...emptyPerson, ...person })
+      setEditingPersonId(person._id || null)
+      setModalError('')
+      setPosition({ x: 0, y: 0 })
+      setShowForm(true)
     }
   }
 
@@ -740,6 +796,8 @@ function PersonTracker({
           disabled={readOnly}
           onClick={() => {
             setDraft({ ...emptyPerson, personDocLink: currentDocControlNumber || '' })
+            setEditingPersonId(null)
+            setSelectedIndex(null)
             setModalError('')
             setPosition({ x: 0, y: 0 })
             setShowForm(true)
@@ -752,10 +810,16 @@ function PersonTracker({
           type="button"
           disabled={readOnly}
           onClick={() => {
-            setDraft({ ...emptyPerson, personDocLink: currentDocControlNumber || '' })
-            setModalError('')
-            setPosition({ x: 0, y: 0 })
-            setShowForm(true)
+            if (selectedIndex !== null && persons[selectedIndex]) {
+              handleOpenEditPerson(selectedIndex)
+            } else {
+              setDraft({ ...emptyPerson, personDocLink: currentDocControlNumber || '' })
+              setEditingPersonId(null)
+              setSelectedIndex(null)
+              setModalError('')
+              setPosition({ x: 0, y: 0 })
+              setShowForm(true)
+            }
           }}
         >
           Link
@@ -819,8 +883,9 @@ function PersonTracker({
               persons.map((person, index) => (
                 <tr
                   className={selectedIndex === index ? 'is-selected' : ''}
-                  key={`${person.personDocLink}-${index}`}
-                  onClick={() => setSelectedIndex(index)}
+                  key={person._id || `${person.personDocLink}-${index}`}
+                  onClick={() => handleSelectPerson(index)}
+                  onDoubleClick={() => handleOpenEditPerson(index)}
                 >
                   <td>{person.personDocLink}</td>
                   <td>{person.firstName}</td>
@@ -844,7 +909,10 @@ function PersonTracker({
           draft={draft}
           updateDraft={updateDraft}
           onSave={addPerson}
-          onClose={() => setShowForm(false)}
+          onClose={() => {
+            setShowForm(false)
+            setEditingPersonId(null)
+          }}
           position={position}
           isDragging={isDragging}
           handleMouseDown={handleMouseDown}
@@ -876,6 +944,7 @@ export default function CodingPage() {
   // Person modal for Alternate Workflow layout
   const [showAwfPersonForm, setShowAwfPersonForm] = useState(false)
   const [awfPersonDraft, setAwfPersonDraft] = useState(emptyPerson)
+  const [editingAwfPersonId, setEditingAwfPersonId] = useState(null)
   const [selectedAwfPersonIndex, setSelectedAwfPersonIndex] = useState(null)
   const [awfPosition, setAwfPosition] = useState({ x: 0, y: 0 })
   const [isAwfDragging, setIsAwfDragging] = useState(false)
@@ -884,7 +953,16 @@ export default function CodingPage() {
   const [awfModalError, setAwfModalError] = useState('')
 
   const handleAwfMouseDown = (e) => {
-    if (e.target.tagName === 'BUTTON') return
+    if (
+      e.target.closest('input, textarea, select, button, a, [role="button"]') ||
+      e.target.tagName === 'BUTTON' ||
+      e.target.tagName === 'INPUT' ||
+      e.target.tagName === 'TEXTAREA' ||
+      e.target.tagName === 'SELECT' ||
+      e.target.tagName === 'A'
+    ) {
+      return
+    }
     setIsAwfDragging(true)
     setAwfDragStart({ x: e.clientX - awfPosition.x, y: e.clientY - awfPosition.y })
   }
@@ -1029,11 +1107,38 @@ export default function CodingPage() {
   }
 
   // Direct persistence handler for Person Tracker entries
-  const handleSavePersonEntry = async (newPersonDraft) => {
+  const handleSavePersonEntry = async (personDraft, editingId = null) => {
     if (readOnly) {
       throw new Error("Cannot edit document belonging to another employee's batch.")
     }
-    const updatedPersons = [...(coding.persons || []), newPersonDraft]
+    const currentPersons = coding.persons || []
+    const targetId = editingId || personDraft._id || null
+    let updatedPersons
+
+    if (targetId && currentPersons.some((p) => p._id && String(p._id) === String(targetId))) {
+      // Update existing person in place preserving stable _id and creation audit metadata
+      updatedPersons = currentPersons.map((p) => {
+        if (p._id && String(p._id) === String(targetId)) {
+          return {
+            ...p,
+            ...personDraft,
+            _id: p._id,
+            createdBy: p.createdBy,
+            createdAt: p.createdAt,
+          }
+        }
+        return p
+      })
+    } else {
+      // Create new person entry with stable _id
+      const newPersonId = personDraft._id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`)
+      const newPerson = {
+        ...personDraft,
+        _id: newPersonId,
+      }
+      updatedPersons = [...currentPersons, newPerson]
+    }
+
     const payload = {
       ...coding,
       persons: updatedPersons,
@@ -1081,8 +1186,9 @@ export default function CodingPage() {
     setIsAwfSaving(true)
     setAwfModalError('')
     try {
-      await handleSavePersonEntry(awfPersonDraft)
+      await handleSavePersonEntry(awfPersonDraft, editingAwfPersonId)
       setAwfPersonDraft(emptyPerson)
+      setEditingAwfPersonId(null)
       setShowAwfPersonForm(false)
     } catch (err) {
       setAwfModalError(err.response?.data?.error || err.message || 'Failed to save person to database.')
@@ -1097,8 +1203,31 @@ export default function CodingPage() {
     try {
       await handlePersistUpdatedPersons(updatedPersons)
       setSelectedAwfPersonIndex(null)
+      setEditingAwfPersonId(null)
+      setAwfPersonDraft(emptyPerson)
     } catch (err) {
       setSaveError(err.response?.data?.error || 'Failed to remove person.')
+    }
+  }
+
+  const handleSelectAwfPerson = (index) => {
+    setSelectedAwfPersonIndex(index)
+    const person = (coding.persons || [])[index]
+    if (person) {
+      setAwfPersonDraft({ ...emptyPerson, ...person })
+      setEditingAwfPersonId(person._id || null)
+    }
+  }
+
+  const handleOpenEditAwfPerson = (index) => {
+    setSelectedAwfPersonIndex(index)
+    const person = (coding.persons || [])[index]
+    if (person) {
+      setAwfPersonDraft({ ...emptyPerson, ...person })
+      setEditingAwfPersonId(person._id || null)
+      setAwfModalError('')
+      setAwfPosition({ x: 0, y: 0 })
+      setShowAwfPersonForm(true)
     }
   }
 
@@ -1682,7 +1811,7 @@ export default function CodingPage() {
                       className="coding-notes"
                       disabled={readOnly}
                       value={coding.reviewerNotes || ''}
-                      onChange={(e) => update('reviewerNotes', e.target.value)}
+                      onChange={(event) => update('reviewerNotes', event.target.value)}
                       placeholder="Reviewer Notes"
                     />
                   </div>
@@ -1699,6 +1828,8 @@ export default function CodingPage() {
                         disabled={readOnly}
                         onClick={() => {
                           setAwfPersonDraft({ ...emptyPerson, personDocLink: document?.controlNumber || '' })
+                          setEditingAwfPersonId(null)
+                          setSelectedAwfPersonIndex(null)
                           setAwfModalError('')
                           setAwfPosition({ x: 0, y: 0 })
                           setShowAwfPersonForm(true)
@@ -1711,10 +1842,16 @@ export default function CodingPage() {
                         type="button"
                         disabled={readOnly}
                         onClick={() => {
-                          setAwfPersonDraft({ ...emptyPerson, personDocLink: document?.controlNumber || '' })
-                          setAwfModalError('')
-                          setAwfPosition({ x: 0, y: 0 })
-                          setShowAwfPersonForm(true)
+                          if (selectedAwfPersonIndex !== null && (coding.persons || [])[selectedAwfPersonIndex]) {
+                            handleOpenEditAwfPerson(selectedAwfPersonIndex)
+                          } else {
+                            setAwfPersonDraft({ ...emptyPerson, personDocLink: document?.controlNumber || '' })
+                            setEditingAwfPersonId(null)
+                            setSelectedAwfPersonIndex(null)
+                            setAwfModalError('')
+                            setAwfPosition({ x: 0, y: 0 })
+                            setShowAwfPersonForm(true)
+                          }
                         }}
                       >
                         Link
@@ -1745,8 +1882,9 @@ export default function CodingPage() {
                           coding.persons.map((person, index) => (
                             <tr
                               className={selectedAwfPersonIndex === index ? 'is-selected' : ''}
-                              key={`${person.personDocLink}-${index}`}
-                              onClick={() => setSelectedAwfPersonIndex(index)}
+                              key={person._id || `${person.personDocLink}-${index}`}
+                              onClick={() => handleSelectAwfPerson(index)}
+                              onDoubleClick={() => handleOpenEditAwfPerson(index)}
                             >
                               <td>{person.personDocLink}</td>
                               <td>{person.firstName}</td>
@@ -1816,7 +1954,10 @@ export default function CodingPage() {
             if (awfModalError) setAwfModalError('')
           }}
           onSave={addAwfPerson}
-          onClose={() => setShowAwfPersonForm(false)}
+          onClose={() => {
+            setShowAwfPersonForm(false)
+            setEditingAwfPersonId(null)
+          }}
           position={awfPosition}
           isDragging={isAwfDragging}
           handleMouseDown={handleAwfMouseDown}

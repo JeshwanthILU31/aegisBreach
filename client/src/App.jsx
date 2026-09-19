@@ -3,6 +3,7 @@ import { Login, Register, ProjectWorkspace, Projects } from './pages'
 import AdminProjectsPage from './components/admin/AdminProjectsPage'
 import AdminBatchesPage from './components/admin/AdminBatchesPage'
 import AdminDocumentsPage from './components/admin/AdminDocumentsPage'
+import AdminPersonTrackerPage from './components/admin/AdminPersonTrackerPage'
 import AdminRoute from './routes/AdminRoute'
 import ProtectedRoute from './routes/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
@@ -71,6 +72,14 @@ function App() {
           element={
             <AdminRoute>
               <AdminDocumentsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/person-tracker"
+          element={
+            <AdminRoute>
+              <AdminPersonTrackerPage />
             </AdminRoute>
           }
         />

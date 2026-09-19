@@ -448,6 +448,34 @@ export default function AdminDocumentsPage() {
           <span className="relativity-mark" style={{ background: '#7c3aed' }}>A</span>
           <span>AegisBreach Admin</span>
         </Link>
+        <nav style={{ marginLeft: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Link
+            to="/admin/projects"
+            style={{
+              color: '#fff',
+              background: '#374151',
+              padding: '4px 10px',
+              borderRadius: '3px',
+              textDecoration: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Workspaces &amp; Projects
+          </Link>
+          <Link
+            to="/admin/person-tracker"
+            style={{
+              color: '#cbd5e1',
+              padding: '4px 10px',
+              borderRadius: '3px',
+              textDecoration: 'none',
+              fontSize: '12px',
+            }}
+          >
+            Person Tracker
+          </Link>
+        </nav>
         <div style={{ marginLeft: '16px', color: '#c4cdd5', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Link to="/admin/projects" style={{ color: '#93c5fd', textDecoration: 'none' }}>Projects</Link>
           <span>/</span>
