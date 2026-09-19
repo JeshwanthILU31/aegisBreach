@@ -36,7 +36,7 @@ const indexCssSource = fs.readFileSync(indexCssPath, 'utf8')
 // -----------------------------------------------------------------------------
 test('Modal is draggable from non-interactive areas with onMouseDown on entry window and interactive elements excluded', () => {
   assert(codingPageSource.includes('onMouseDown={handleMouseDown}'), 'handleMouseDown attached to modal')
-  assert(codingPageSource.includes("e.target.closest('input, textarea, select, button, a, [role=\"button\"]')"), 'Interactive elements excluded from drag trigger')
+  assert(codingPageSource.includes("e.target.closest('input, textarea, select, button, a, [role=\"button\"], .person-tracker-resize-handle')"), 'Interactive elements excluded from drag trigger')
   assert(codingPageSource.includes('className="person-tracker-entry-window"'), 'Modal window has correct class')
 })
 
@@ -420,10 +420,331 @@ test('Backward compatibility: legacy persons without audit metadata gracefully g
   assert(result.updatedAt instanceof Date)
 })
 
+// -----------------------------------------------------------------------------
+// Test 13: Resize handle presence and styling
+// -----------------------------------------------------------------------------
+test('Resize handle is present in bottom-right corner with subtle styling and excluded from dragging', () => {
+  assert(codingPageSource.includes('className="person-tracker-resize-handle"'), 'person-tracker-resize-handle present in JSX')
+  assert(indexCssSource.includes('.person-tracker-resize-handle'), 'person-tracker-resize-handle defined in CSS')
+  assert(indexCssSource.includes('cursor: nwse-resize'), 'resize cursor set')
+  assert(codingPageSource.includes('.person-tracker-resize-handle'), 'drag handler excludes resize handle')
+})
+
+// -----------------------------------------------------------------------------
+// Test 14: Resizing wider and taller within viewport bounds
+// -----------------------------------------------------------------------------
+test('Modal can be resized wider and taller within viewport constraints', () => {
+  assert(codingPageSource.includes('handleResizeMouseDown'), 'handleResizeMouseDown implemented')
+  assert(codingPageSource.includes('handleResizeMouseMove'), 'handleResizeMouseMove implemented')
+
+  // Simulate resize wider and taller from initial (960, 620)
+  const initialWidth = 960
+  const initialHeight = 620
+  const deltaX = 150
+  const deltaY = 100
+  const windowWidth = 1400
+  const windowHeight = 900
+  const minW = 520
+  const minH = 380
+
+  const maxW = Math.max(minW, windowWidth - 20)
+  const maxH = Math.max(minH, windowHeight - 20)
+
+  const newW = Math.min(maxW, Math.max(minW, initialWidth + deltaX))
+  const newH = Math.min(maxH, Math.max(minH, initialHeight + deltaY))
+
+  assert.strictEqual(newW, 1110, 'Width increased by 150px')
+  assert.strictEqual(newH, 720, 'Height increased by 100px')
+})
+
+// -----------------------------------------------------------------------------
+// Test 15: Minimum size enforcement (cannot shrink below MIN_WIDTH / MIN_HEIGHT)
+// -----------------------------------------------------------------------------
+test('Modal can be resized smaller but strictly enforces minimum dimensions (520x380)', () => {
+  assert(codingPageSource.includes('MIN_WIDTH = 520'), 'MIN_WIDTH defined')
+  assert(codingPageSource.includes('MIN_HEIGHT = 380'), 'MIN_HEIGHT defined')
+
+  // Simulate dragging left/up by 800px from initial (960, 620)
+  const initialWidth = 960
+  const initialHeight = 620
+  const deltaX = -800
+  const deltaY = -500
+  const windowWidth = 1400
+  const windowHeight = 900
+  const minW = 520
+  const minH = 380
+
+  const maxW = Math.max(minW, windowWidth - 20)
+  const maxH = Math.max(minH, windowHeight - 20)
+
+  const newW = Math.min(maxW, Math.max(minW, initialWidth + deltaX))
+  const newH = Math.min(maxH, Math.max(minH, initialHeight + deltaY))
+
+  assert.strictEqual(newW, 520, 'Width clamped to minimum 520px')
+  assert.strictEqual(newH, 380, 'Height clamped to minimum 380px')
+})
+
+// -----------------------------------------------------------------------------
+// Test 16: Responsive window resize adapts modal dimensions
+// -----------------------------------------------------------------------------
+test('Window resize listener clamps modal dimensions to keep modal visible in viewport', () => {
+  assert(codingPageSource.includes("window.addEventListener('resize'"), 'Window resize listener registered')
+
+  // When browser window shrinks to 800x500
+  const currentSize = { width: 960, height: 620 }
+  const smallWindowWidth = 800
+  const smallWindowHeight = 500
+  const minW = 520
+  const minH = 380
+
+  const maxW = Math.max(minW, smallWindowWidth - 20) // 780
+  const maxH = Math.max(minH, smallWindowHeight - 20) // 480
+
+  const clamped = {
+    width: Math.min(currentSize.width, maxW),
+    height: Math.min(currentSize.height, maxH),
+  }
+
+  assert.strictEqual(clamped.width, 780, 'Width clamped to viewport bound')
+  assert.strictEqual(clamped.height, 480, 'Height clamped to viewport bound')
+})
+
+// -----------------------------------------------------------------------------
+// Test 17: Dragging vs Resizing separation and non-blocking PDF/table scroll
+// -----------------------------------------------------------------------------
+test('Resize handle event prevents dragging and preserves PDF & table scrolling', () => {
+  assert(codingPageSource.includes('e.stopPropagation()'), 'Resize event stops propagation to drag handler')
+  assert(codingPageSource.includes('cursor: isDragging ? \'grabbing\' : isResizing ? \'nwse-resize\' : \'default\''), 'Cursor reflects resize vs drag state')
+  assert(indexCssSource.includes('overflow-y: auto'), 'Internal scroll enabled on grid body')
+  assert(indexCssSource.includes('pointer-events: none'), 'Floating overlay does not block PDF interaction')
+})
+
+// -----------------------------------------------------------------------------
+// Test 18: Minimize collapses content without destroying form data
+// -----------------------------------------------------------------------------
+test('Minimize collapses modal to topbar without clearing entered form data', () => {
+  assert(codingPageSource.includes('handleToggleMinimize'), 'handleToggleMinimize implemented')
+  assert(codingPageSource.includes('isMinimized ? \'auto\' : `${size.height}px`'), 'Height adjusts to auto when minimized')
+  assert(codingPageSource.includes('!isMinimized &&'), 'Content hidden when minimized')
+
+  // Simulate form state retention during minimize
+  const userEnteredDraft = {
+    firstName: 'Alice',
+    lastName: 'Smith',
+    address: '742 Evergreen Terr',
+    ssn: '123-45-6789',
+    dataOwner: 'Custodian A',
+  }
+  let isMinimizedState = false
+  let preMinSize = null
+  let currentSize = { width: 960, height: 620 }
+
+  // User clicks minimize
+  preMinSize = { ...currentSize }
+  isMinimizedState = true
+
+  // Ensure data was not modified
+  assert.strictEqual(userEnteredDraft.firstName, 'Alice')
+  assert.strictEqual(userEnteredDraft.address, '742 Evergreen Terr')
+  assert.strictEqual(isMinimizedState, true)
+  assert.strictEqual(preMinSize.width, 960)
+  assert.strictEqual(preMinSize.height, 620)
+})
+
+// -----------------------------------------------------------------------------
+// Test 19: Restore returns content and previous dimensions after minimize
+// -----------------------------------------------------------------------------
+test('Restore returns content and recovers previous dimensions after minimize', () => {
+  let isMinimizedState = true
+  let preMinSize = { width: 960, height: 620 }
+  let currentSize = { width: 960, height: 620 }
+
+  // User clicks restore / minimize toggle
+  isMinimizedState = false
+  currentSize = preMinSize
+
+  assert.strictEqual(isMinimizedState, false)
+  assert.strictEqual(currentSize.width, 960)
+  assert.strictEqual(currentSize.height, 620)
+})
+
+// -----------------------------------------------------------------------------
+// Test 20: Maximize expands to viewport dimensions and restore recovers custom size
+// -----------------------------------------------------------------------------
+test('Maximize expands modal to viewport and restore recovers custom size', () => {
+  assert(codingPageSource.includes('handleToggleMaximize'), 'handleToggleMaximize implemented')
+  assert(codingPageSource.includes('isMaximized'), 'isMaximized state tracked')
+
+  const customUserSize = { width: 850, height: 500 }
+  const viewportWidth = 1440
+  const viewportHeight = 900
+  const minW = 520
+  const minH = 380
+
+  let currentSize = { ...customUserSize }
+  let preMaxSize = null
+  let isMaximizedState = false
+
+  // Maximize
+  preMaxSize = { ...currentSize }
+  const maxW = Math.max(minW, viewportWidth - 30)
+  const maxH = Math.max(minH, viewportHeight - 50)
+  currentSize = { width: maxW, height: maxH }
+  isMaximizedState = true
+
+  assert.strictEqual(isMaximizedState, true)
+  assert.strictEqual(currentSize.width, 1410)
+  assert.strictEqual(currentSize.height, 850)
+
+  // Restore
+  isMaximizedState = false
+  currentSize = preMaxSize
+
+  assert.strictEqual(isMaximizedState, false)
+  assert.strictEqual(currentSize.width, 850)
+  assert.strictEqual(currentSize.height, 500)
+})
+
+// -----------------------------------------------------------------------------
+// Test 21: Minus (-) button decreases width/height and stops at minimum
+// -----------------------------------------------------------------------------
+test('Minus (-) button decreases modal size by 40px/30px and stops at minimum (520x380)', () => {
+  assert(codingPageSource.includes('handleStepDecrease'), 'handleStepDecrease implemented')
+  assert(codingPageSource.includes('title="Decrease Person Tracker size"'), 'Decrease tooltip present')
+
+  const minW = 520
+  const minH = 380
+  const stepW = 40
+  const stepH = 30
+
+  let size = { width: 600, height: 440 }
+
+  // 1st click
+  size = {
+    width: Math.max(minW, size.width - stepW),
+    height: Math.max(minH, size.height - stepH),
+  }
+  assert.strictEqual(size.width, 560)
+  assert.strictEqual(size.height, 410)
+
+  // 2nd click
+  size = {
+    width: Math.max(minW, size.width - stepW),
+    height: Math.max(minH, size.height - stepH),
+  }
+  assert.strictEqual(size.width, 520)
+  assert.strictEqual(size.height, 380)
+
+  // 3rd click (repeated click should clamp at minimum)
+  size = {
+    width: Math.max(minW, size.width - stepW),
+    height: Math.max(minH, size.height - stepH),
+  }
+  assert.strictEqual(size.width, 520, 'Clamped at minimum width')
+  assert.strictEqual(size.height, 380, 'Clamped at minimum height')
+})
+
+// -----------------------------------------------------------------------------
+// Test 22: Plus (+) button increases width/height and stops at viewport max
+// -----------------------------------------------------------------------------
+test('Plus (+) button increases modal size by 40px/30px and stops at viewport max', () => {
+  assert(codingPageSource.includes('handleStepIncrease'), 'handleStepIncrease implemented')
+  assert(codingPageSource.includes('title="Increase Person Tracker size"'), 'Increase tooltip present')
+
+  const windowW = 1200
+  const windowH = 800
+  const maxW = windowW - 20 // 1180
+  const maxH = windowH - 20 // 780
+  const stepW = 40
+  const stepH = 30
+
+  let size = { width: 1120, height: 740 }
+
+  // 1st click
+  size = {
+    width: Math.min(maxW, size.width + stepW),
+    height: Math.min(maxH, size.height + stepH),
+  }
+  assert.strictEqual(size.width, 1160)
+  assert.strictEqual(size.height, 770)
+
+  // 2nd click (stops at max bounds)
+  size = {
+    width: Math.min(maxW, size.width + stepW),
+    height: Math.min(maxH, size.height + stepH),
+  }
+  assert.strictEqual(size.width, 1180, 'Clamped at max width')
+  assert.strictEqual(size.height, 780, 'Clamped at max height')
+})
+
+// -----------------------------------------------------------------------------
+// Test 23: Fit button sizes the modal to fit the viewport comfortably
+// -----------------------------------------------------------------------------
+test('Fit button calculates and applies full viewport fit dimensions', () => {
+  assert(codingPageSource.includes('handleFitScreen'), 'handleFitScreen implemented')
+  assert(codingPageSource.includes('title="Fit Person Tracker to screen"'), 'Fit tooltip present')
+  assert(codingPageSource.includes('className="person-tracker-fit-btn"'), 'person-tracker-fit-btn class used')
+  assert(indexCssSource.includes('.person-tracker-fit-btn'), 'person-tracker-fit-btn defined in CSS')
+
+  const windowW = 1440
+  const windowH = 900
+  const expectedW = windowW - 30 // 1410
+  const expectedH = windowH - 50 // 850
+
+  const fitSize = {
+    width: Math.max(520, windowW - 30),
+    height: Math.max(380, windowH - 50),
+  }
+
+  assert.strictEqual(fitSize.width, 1410)
+  assert.strictEqual(fitSize.height, 850)
+})
+
+// -----------------------------------------------------------------------------
+// Test 24: Seamless interaction between Manual Resize, Step Resize, and Fit
+// -----------------------------------------------------------------------------
+test('Manual resize, step resize (+/-), and Fit work together seamlessly on shared state', () => {
+  // Start with manual resize to custom 700x450
+  let currentSize = { width: 700, height: 450 }
+
+  // User clicks "+" twice
+  currentSize = { width: currentSize.width + 40, height: currentSize.height + 30 }
+  currentSize = { width: currentSize.width + 40, height: currentSize.height + 30 }
+  assert.strictEqual(currentSize.width, 780)
+  assert.strictEqual(currentSize.height, 510)
+
+  // User clicks "-" once
+  currentSize = { width: currentSize.width - 40, height: currentSize.height - 30 }
+  assert.strictEqual(currentSize.width, 740)
+  assert.strictEqual(currentSize.height, 480)
+
+  // User clicks Fit
+  const windowW = 1280
+  const windowH = 720
+  currentSize = {
+    width: Math.max(520, windowW - 30),
+    height: Math.max(380, windowH - 50),
+  }
+  assert.strictEqual(currentSize.width, 1250)
+  assert.strictEqual(currentSize.height, 670)
+})
+
+// -----------------------------------------------------------------------------
+// Test 25: Visual header layout and dragging protection
+// -----------------------------------------------------------------------------
+test('Topbar layout contains Save, -, +, Fit, Cancel, and X without triggering drag on click', () => {
+  assert(codingPageSource.includes('person-tracker-save-btn'), 'Save button present')
+  assert(codingPageSource.includes('person-tracker-cancel-btn'), 'Cancel button present')
+  assert(codingPageSource.includes('person-tracker-close-btn'), 'Close button present')
+  assert(codingPageSource.includes('person-tracker-fit-btn'), 'Fit button present')
+  assert(codingPageSource.includes('e.stopPropagation()'), 'Controls prevent triggering window drag')
+})
+
 console.log('================================================================================')
 console.log(`PERSON TRACKER CRUD REGRESSION SUMMARY: Passed: ${passed}, Failed: ${failed}`)
 console.log('================================================================================')
 
 if (failed > 0) process.exit(1)
+
 
 

@@ -116,6 +116,164 @@ function PersonTrackerModal({
   isSaving = false,
   error = '',
 }) {
+  const MIN_WIDTH = 520
+  const MIN_HEIGHT = 380
+
+  const [size, setSize] = useState(() => {
+    const defaultW = 960
+    const defaultH = 620
+    if (typeof window !== 'undefined') {
+      return {
+        width: Math.min(defaultW, Math.max(MIN_WIDTH, window.innerWidth - 60)),
+        height: Math.min(defaultH, Math.max(MIN_HEIGHT, window.innerHeight - 100)),
+      }
+    }
+    return { width: defaultW, height: defaultH }
+  })
+
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizeStart, setResizeStart] = useState({ mouseX: 0, mouseY: 0, startW: 960, startH: 620 })
+  const [isMinimized, setIsMinimized] = useState(false)
+  const [isMaximized, setIsMaximized] = useState(false)
+  const [preMaximizeSize, setPreMaximizeSize] = useState(null)
+  const [preMinimizeSize, setPreMinimizeSize] = useState(null)
+
+  const STEP_WIDTH = 40
+  const STEP_HEIGHT = 30
+
+  const handleStepDecrease = (e) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    if (isMinimized) setIsMinimized(false)
+    if (isMaximized) setIsMaximized(false)
+    setSize((curr) => ({
+      width: Math.max(MIN_WIDTH, curr.width - STEP_WIDTH),
+      height: Math.max(MIN_HEIGHT, curr.height - STEP_HEIGHT),
+    }))
+  }
+
+  const handleStepIncrease = (e) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    if (isMinimized) setIsMinimized(false)
+    const maxW = typeof window !== 'undefined' ? Math.max(MIN_WIDTH, window.innerWidth - 20) : 1920
+    const maxH = typeof window !== 'undefined' ? Math.max(MIN_HEIGHT, window.innerHeight - 20) : 1080
+    setSize((curr) => ({
+      width: Math.min(maxW, curr.width + STEP_WIDTH),
+      height: Math.min(maxH, curr.height + STEP_HEIGHT),
+    }))
+  }
+
+  const handleFitScreen = (e) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    if (isMinimized) setIsMinimized(false)
+    const maxW = typeof window !== 'undefined' ? Math.max(MIN_WIDTH, window.innerWidth - 30) : 1920
+    const maxH = typeof window !== 'undefined' ? Math.max(MIN_HEIGHT, window.innerHeight - 50) : 1080
+    setSize({ width: maxW, height: maxH })
+    setIsMaximized(true)
+  }
+
+  const handleToggleMinimize = (e) => {
+    e?.stopPropagation()
+    if (!isMinimized) {
+      setPreMinimizeSize({ ...size })
+      setIsMinimized(true)
+    } else {
+      setIsMinimized(false)
+      if (preMinimizeSize) {
+        setSize(preMinimizeSize)
+      }
+    }
+  }
+
+  const handleToggleMaximize = (e) => {
+    e?.stopPropagation()
+    if (isMinimized) {
+      setIsMinimized(false)
+    }
+    if (!isMaximized) {
+      setPreMaximizeSize({ ...size })
+      const maxW = typeof window !== 'undefined' ? Math.max(MIN_WIDTH, window.innerWidth - 30) : 1920
+      const maxH = typeof window !== 'undefined' ? Math.max(MIN_HEIGHT, window.innerHeight - 50) : 1080
+      setSize({ width: maxW, height: maxH })
+      setIsMaximized(true)
+    } else {
+      setIsMaximized(false)
+      if (preMaximizeSize) {
+        setSize(preMaximizeSize)
+      } else {
+        setSize({ width: 960, height: 620 })
+      }
+    }
+  }
+
+  const handleResizeMouseDown = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (isMaximized) {
+      setIsMaximized(false)
+    }
+    setIsResizing(true)
+    setResizeStart({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startW: size.width,
+      startH: size.height,
+    })
+  }
+
+  const handleResizeMouseMove = useCallback(
+    (e) => {
+      if (!isResizing) return
+      const deltaX = e.clientX - resizeStart.mouseX
+      const deltaY = e.clientY - resizeStart.mouseY
+
+      const maxW = typeof window !== 'undefined' ? Math.max(MIN_WIDTH, window.innerWidth - 20) : 1920
+      const maxH = typeof window !== 'undefined' ? Math.max(MIN_HEIGHT, window.innerHeight - 20) : 1080
+
+      const newWidth = Math.min(maxW, Math.max(MIN_WIDTH, resizeStart.startW + deltaX))
+      const newHeight = Math.min(maxH, Math.max(MIN_HEIGHT, resizeStart.startH + deltaY))
+
+      setSize({ width: newWidth, height: newHeight })
+    },
+    [isResizing, resizeStart]
+  )
+
+  const handleResizeMouseUp = useCallback(() => {
+    setIsResizing(false)
+  }, [])
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleResizeMouseMove)
+      window.addEventListener('mouseup', handleResizeMouseUp)
+      return () => {
+        window.removeEventListener('mousemove', handleResizeMouseMove)
+        window.removeEventListener('mouseup', handleResizeMouseUp)
+      }
+    }
+  }, [isResizing, handleResizeMouseMove, handleResizeMouseUp])
+
+  // Handle browser window resize gracefully (Requirement 7)
+  useEffect(() => {
+    const handleWindowResize = () => {
+      setSize((curr) => {
+        const maxW = Math.max(MIN_WIDTH, window.innerWidth - 20)
+        const maxH = Math.max(MIN_HEIGHT, window.innerHeight - 20)
+        if (curr.width > maxW || curr.height > maxH) {
+          return {
+            width: Math.min(curr.width, maxW),
+            height: Math.min(curr.height, maxH),
+          }
+        }
+        return curr
+      })
+    }
+    window.addEventListener('resize', handleWindowResize)
+    return () => window.removeEventListener('resize', handleWindowResize)
+  }, [])
+
   return (
     <div className="person-tracker-overlay-floating">
       <div
@@ -126,7 +284,13 @@ function PersonTrackerModal({
         onMouseDown={handleMouseDown}
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
-          cursor: isDragging ? 'grabbing' : 'default',
+          width: `${size.width}px`,
+          height: isMinimized ? 'auto' : `${size.height}px`,
+          minWidth: isMinimized ? '340px' : `${MIN_WIDTH}px`,
+          minHeight: isMinimized ? 'auto' : `${MIN_HEIGHT}px`,
+          maxWidth: 'calc(100vw - 20px)',
+          maxHeight: isMinimized ? 'none' : 'calc(100vh - 40px)',
+          cursor: isDragging ? 'grabbing' : isResizing ? 'nwse-resize' : 'default',
         }}
       >
         {/* Top Header Bar matching Relativity layout */}
@@ -148,6 +312,40 @@ function PersonTrackerModal({
             >
               {isSaving ? 'Saving...' : 'Save'}
             </button>
+
+            {/* Minus Button */}
+            <button
+              className="person-tracker-icon-btn"
+              type="button"
+              onClick={handleStepDecrease}
+              title="Decrease Person Tracker size"
+              aria-label="Decrease Person Tracker size"
+            >
+              −
+            </button>
+
+            {/* Plus Button */}
+            <button
+              className="person-tracker-icon-btn"
+              type="button"
+              onClick={handleStepIncrease}
+              title="Increase Person Tracker size"
+              aria-label="Increase Person Tracker size"
+            >
+              +
+            </button>
+
+            {/* Fit Button */}
+            <button
+              className="person-tracker-fit-btn"
+              type="button"
+              onClick={handleFitScreen}
+              title="Fit Person Tracker to screen"
+              aria-label="Fit Person Tracker to screen"
+            >
+              Fit
+            </button>
+
             <button
               className="person-tracker-cancel-btn"
               type="button"
@@ -156,6 +354,7 @@ function PersonTrackerModal({
             >
               Cancel
             </button>
+
             <button
               className="person-tracker-close-btn"
               type="button"
@@ -166,6 +365,9 @@ function PersonTrackerModal({
             </button>
           </div>
         </div>
+
+        {!isMinimized && (
+          <>
 
         {/* Optional Error Banner */}
         {error && (
@@ -629,6 +831,22 @@ function PersonTrackerModal({
             </div>
           </div>
         </div>
+
+        {/* Bottom-right corner resize handle */}
+        <div
+          className="person-tracker-resize-handle"
+          onMouseDown={handleResizeMouseDown}
+          title="Drag to resize Person Tracker"
+          aria-label="Resize modal"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="#8fa1b4" strokeWidth="1.2" strokeLinecap="round" />
+            <line x1="8.5" y1="4.5" x2="4.5" y2="8.5" stroke="#8fa1b4" strokeWidth="1.2" strokeLinecap="round" />
+            <line x1="8.5" y1="7.5" x2="7.5" y2="8.5" stroke="#8fa1b4" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        </div>
+        </>
+        )}
       </div>
     </div>
   )
@@ -654,7 +872,7 @@ function PersonTracker({
 
   const handleMouseDown = (e) => {
     if (
-      e.target.closest('input, textarea, select, button, a, [role="button"]') ||
+      e.target.closest('input, textarea, select, button, a, [role="button"], .person-tracker-resize-handle') ||
       e.target.tagName === 'BUTTON' ||
       e.target.tagName === 'INPUT' ||
       e.target.tagName === 'TEXTAREA' ||
@@ -954,7 +1172,7 @@ export default function CodingPage() {
 
   const handleAwfMouseDown = (e) => {
     if (
-      e.target.closest('input, textarea, select, button, a, [role="button"]') ||
+      e.target.closest('input, textarea, select, button, a, [role="button"], .person-tracker-resize-handle') ||
       e.target.tagName === 'BUTTON' ||
       e.target.tagName === 'INPUT' ||
       e.target.tagName === 'TEXTAREA' ||

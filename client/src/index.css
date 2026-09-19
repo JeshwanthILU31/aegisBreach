@@ -350,6 +350,47 @@ input:focus { border-color: #527b9d; box-shadow: 0 0 0 1px #527b9d; }
 .person-tracker-cancel-btn:hover {
   background: #f0f0f0 !important;
 }
+.person-tracker-icon-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.person-tracker-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.65);
+}
+.person-tracker-fit-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  height: 22px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s;
+}
+.person-tracker-fit-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.65);
+}
 .person-tracker-close-btn {
   background: transparent;
   border: 0;
@@ -357,7 +398,7 @@ input:focus { border-color: #527b9d; box-shadow: 0 0 0 1px #527b9d; }
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
-  margin-left: 6px;
+  margin-left: 4px;
   line-height: 1;
 }
 .person-tracker-subheader {
@@ -392,13 +433,32 @@ input:focus { border-color: #527b9d; box-shadow: 0 0 0 1px #527b9d; }
 }
 .person-tracker-grid-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 4px 18px;
   padding: 10px 16px 14px 16px;
   overflow-y: auto;
+  overflow-x: hidden;
   flex: 1;
   min-height: 0;
   background: #f7f9fa;
+}
+.person-tracker-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  z-index: 10;
+  user-select: none;
+  touch-action: none;
+  padding: 2px;
+}
+.person-tracker-resize-handle:hover svg line {
+  stroke: #1976d2;
 }
 .person-tracker-column {
   display: flex;
