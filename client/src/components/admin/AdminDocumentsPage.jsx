@@ -74,12 +74,7 @@ export default function AdminDocumentsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Row-level upload state
-  const [uploadingDoc, setUploadingDoc] = useState(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadFeedback, setUploadFeedback] = useState({ message: '', type: '' })
-
-  // Search & Filters
+  // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('')
   const [extractionFilter, setExtractionFilter] = useState('All')
   const [reportableFilter, setReportableFilter] = useState('All')
@@ -96,29 +91,56 @@ export default function AdminDocumentsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
 
-  // Load project, batch, and documents
+  // Per-document upload states
+  const [uploadingDocIds, setUploadingDocIds] = useState({})
+  const [uploadProgressByDocId, setUploadProgressByDocId] = useState({})
+  const [uploadErrorByDocId, setUploadErrorByDocId] = useState({})
+  const [dragOverDocId, setDragOverDocId] = useState(null)
+  const [uploadFeedback, setUploadFeedback] = useState({ message: '', type: '' })
+  const uploadDocTargetRef = useRef(null)
+  const dragEnterCountersRef = useRef({})
+
+  const getDocKey = (doc) => String(doc?._id || doc?.controlNumber || '')
+
+  // Prevent browser from opening files dropped outside active drop zones
+  useEffect(() => {
+    const handleWindowDragOver = (e) => {
+      e.preventDefault()
+    }
+    const handleWindowDrop = (e) => {
+      e.preventDefault()
+    }
+    window.addEventListener('dragover', handleWindowDragOver)
+    window.addEventListener('drop', handleWindowDrop)
+    return () => {
+      window.removeEventListener('dragover', handleWindowDragOver)
+      window.removeEventListener('drop', handleWindowDrop)
+    }
+  }, [])
+
+  // Load project, batch, and documents concurrently via Promise.all
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
 
-      // Fetch project info
-      const projs = await projectsApi.getProjects()
+      const [projs, batchList, docList] = await Promise.all([
+        projectsApi.getProjects(),
+        batchesApi.getBatches(activeProjectId),
+        documentsApi.getDocuments(activeProjectId, { batchId }),
+      ])
+
       if (Array.isArray(projs)) {
         const currentProj = projs.find((p) => p._id === activeProjectId || p.slug === activeProjectId)
         if (currentProj) setProject(currentProj)
       }
 
-      // Fetch batches for this project
-      const batchList = await batchesApi.getBatches(activeProjectId)
       if (Array.isArray(batchList)) {
         setAllBatches(batchList)
         const currentBatch = batchList.find((b) => b._id === batchId)
         if (currentBatch) setBatch(currentBatch)
       }
 
-      // Fetch documents for this batch
-      const docList = await documentsApi.getDocuments(activeProjectId, { batchId })
       if (Array.isArray(docList)) {
         setDocuments(docList)
       }
@@ -169,62 +191,145 @@ export default function AdminDocumentsPage() {
     })
   }, [documents, searchQuery, extractionFilter, reportableFilter, reviewFilter, fileFilter])
 
-  // Trigger file upload for a specific document row
+  // Unified upload pipeline for a document row (used by button picker & drag-and-drop)
+  const performDocumentUpload = async (doc, file) => {
+    if (!doc || !file) return
+    const docKey = getDocKey(doc)
+    if (!docKey) return
+
+    const validationErr = validateFile(file)
+    if (validationErr) {
+      setUploadErrorByDocId((prev) => ({ ...prev, [docKey]: validationErr }))
+      setUploadFeedback({ message: validationErr, type: 'error' })
+      return
+    }
+
+    try {
+      setUploadingDocIds((prev) => ({ ...prev, [docKey]: true }))
+      setUploadProgressByDocId((prev) => ({ ...prev, [docKey]: 1 }))
+      setUploadErrorByDocId((prev) => {
+        const next = { ...prev }
+        delete next[docKey]
+        return next
+      })
+
+      const updated = await documentsApi.uploadDocumentFile(
+        activeProjectId,
+        batchId,
+        doc.controlNumber || doc._id,
+        file,
+        (progressEvent) => {
+          if (progressEvent.total) {
+            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            setUploadProgressByDocId((prev) => ({ ...prev, [docKey]: percent }))
+          }
+        }
+      )
+
+      // Update ONLY the affected document row in local state (NO full table reload/loadData())
+      setDocuments((prev) =>
+        prev.map((d) => {
+          const match =
+            (d._id && updated._id && d._id === updated._id) ||
+            (d.controlNumber && updated.controlNumber && d.controlNumber === updated.controlNumber)
+          return match ? { ...d, ...updated } : d
+        })
+      )
+
+      setUploadFeedback({
+        message: `File "${file.name}" uploaded successfully for ${doc.controlNumber}.`,
+        type: 'success',
+      })
+    } catch (err) {
+      const errMsg = err.response?.data?.error || err.message || 'File upload failed.'
+      setUploadErrorByDocId((prev) => ({ ...prev, [docKey]: errMsg }))
+      setUploadFeedback({
+        message: errMsg,
+        type: 'error',
+      })
+    } finally {
+      setUploadingDocIds((prev) => {
+        const next = { ...prev }
+        delete next[docKey]
+        return next
+      })
+      setUploadProgressByDocId((prev) => {
+        const next = { ...prev }
+        delete next[docKey]
+        return next
+      })
+    }
+  }
+
+  // Trigger file upload for a specific document row via file picker
   const triggerFileUpload = (doc) => {
-    setUploadingDoc(doc)
-    setUploadProgress(0)
-    setUploadFeedback({ message: '', type: '' })
+    uploadDocTargetRef.current = doc
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
       fileInputRef.current.click()
     }
   }
 
-  // Handle row-level file selected
+  // Handle row-level file selected via file input
   const handleRowFileSelected = async (e) => {
     const file = e.target.files?.[0]
-    if (!file || !uploadingDoc) return
+    const targetDoc = uploadDocTargetRef.current
+    if (!file || !targetDoc) return
+    await performDocumentUpload(targetDoc, file)
+  }
 
-    const validationErr = validateFile(file)
-    if (validationErr) {
-      setUploadFeedback({ message: validationErr, type: 'error' })
-      setUploadingDoc(null)
+  // Drag & drop handlers for document rows
+  const handleRowDragEnter = (e, doc) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const docKey = getDocKey(doc)
+    dragEnterCountersRef.current[docKey] = (dragEnterCountersRef.current[docKey] || 0) + 1
+    setDragOverDocId(docKey)
+  }
+
+  const handleRowDragOver = (e, doc) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = 'copy'
+    const docKey = getDocKey(doc)
+    if (dragOverDocId !== docKey) {
+      setDragOverDocId(docKey)
+    }
+  }
+
+  const handleRowDragLeave = (e, doc) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const docKey = getDocKey(doc)
+    const count = (dragEnterCountersRef.current[docKey] || 1) - 1
+    dragEnterCountersRef.current[docKey] = count
+    if (count <= 0) {
+      delete dragEnterCountersRef.current[docKey]
+      if (dragOverDocId === docKey) {
+        setDragOverDocId(null)
+      }
+    }
+  }
+
+  const handleRowDrop = async (e, doc) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const docKey = getDocKey(doc)
+    delete dragEnterCountersRef.current[docKey]
+    setDragOverDocId(null)
+
+    const files = e.dataTransfer?.files
+    if (!files || files.length === 0) return
+
+    if (files.length > 1) {
+      const msg = 'Only one file can be dropped onto a document row at a time.'
+      setUploadErrorByDocId((prev) => ({ ...prev, [docKey]: msg }))
+      setUploadFeedback({ message: msg, type: 'error' })
       return
     }
 
-    try {
-      setUploadProgress(1)
-      const updated = await documentsApi.uploadDocumentFile(
-        activeProjectId,
-        batchId,
-        uploadingDoc.controlNumber || uploadingDoc._id,
-        file,
-        (progressEvent) => {
-          if (progressEvent.total) {
-            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-            setUploadProgress(percent)
-          }
-        }
-      )
-      setUploadFeedback({
-        message: `File "${file.name}" uploaded successfully for ${uploadingDoc.controlNumber}.`,
-        type: 'success',
-      })
-      setUploadingDoc(null)
-      setUploadProgress(0)
-      // Update local state and reload
-      setDocuments((prev) =>
-        prev.map((d) => (d._id === updated._id || d.controlNumber === updated.controlNumber ? updated : d))
-      )
-      await loadData()
-    } catch (err) {
-      setUploadFeedback({
-        message: err.response?.data?.error || err.message || 'File upload failed.',
-        type: 'error',
-      })
-      setUploadingDoc(null)
-      setUploadProgress(0)
-    }
+    const file = files[0]
+    await performDocumentUpload(doc, file)
   }
 
   // Open Modals
@@ -779,12 +884,32 @@ export default function AdminDocumentsPage() {
                   </tr>
                 ) : (
                   filteredDocuments.map((doc, index) => {
+                    const docKey = getDocKey(doc)
                     const isReviewed = Boolean(doc.flrReviewedBy)
-                    const isCurrentUploading = uploadingDoc?._id === doc._id || uploadingDoc?.controlNumber === doc.controlNumber
+                    const isCurrentUploading = Boolean(uploadingDocIds[docKey])
+                    const currentProgress = uploadProgressByDocId[docKey] || 0
+                    const isDragOver = dragOverDocId === docKey
+                    const rowError = uploadErrorByDocId[docKey]
                     const fileExtension = (doc.format || doc.fileName?.split('.').pop() || 'FILE').toUpperCase()
 
                     return (
-                      <tr key={doc._id || doc.controlNumber || index}>
+                      <tr
+                        key={doc._id || doc.controlNumber || index}
+                        onDragEnter={(e) => handleRowDragEnter(e, doc)}
+                        onDragOver={(e) => handleRowDragOver(e, doc)}
+                        onDragLeave={(e) => handleRowDragLeave(e, doc)}
+                        onDrop={(e) => handleRowDrop(e, doc)}
+                        style={{
+                          background: isDragOver
+                            ? '#eff6ff'
+                            : rowError
+                            ? '#fff5f5'
+                            : undefined,
+                          outline: isDragOver ? '2px dashed #3b82f6' : undefined,
+                          outlineOffset: '-2px',
+                          transition: 'background-color 0.15s ease, outline 0.15s ease',
+                        }}
+                      >
                         <td style={{ textAlign: 'center', color: '#68767e' }}>{index + 1}</td>
                         <td style={{ fontWeight: 600, color: '#105280', fontFamily: 'monospace' }}>
                           {doc.controlNumber}
@@ -880,35 +1005,63 @@ export default function AdminDocumentsPage() {
                         </td>
                         <td style={{ color: '#4d5e67' }}>{doc.flrReviewedOn || '-'}</td>
                         <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', gap: '4px' }}>
-                            <button
-                              className="legacy-button"
-                              type="button"
-                              onClick={() => triggerFileUpload(doc)}
-                              disabled={isCurrentUploading}
-                              title={
-                                doc.fileUrl
-                                  ? 'Upload a new file to replace the existing Cloudinary asset'
-                                  : 'Upload file to Cloudinary'
-                              }
-                              style={{ padding: '2px 8px', fontSize: '11px', color: doc.fileUrl ? '#1e40af' : '#03543f' }}
-                            >
-                              {isCurrentUploading
-                                ? `Uploading ${uploadProgress}%...`
-                                : doc.fileUrl
-                                ? 'Replace'
-                                : 'Upload File'}
-                            </button>
-                            <button
-                              className="legacy-button"
-                              type="button"
-                              onClick={() => openDeleteModal(doc)}
-                              disabled={isCurrentUploading}
-                              title="Delete document & coding record"
-                              style={{ padding: '2px 8px', fontSize: '11px', color: '#9b1c1c' }}
-                            >
-                              Delete
-                            </button>
+                          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                            <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                              <button
+                                className="legacy-button"
+                                type="button"
+                                onClick={() => triggerFileUpload(doc)}
+                                disabled={isCurrentUploading}
+                                title={
+                                  isDragOver
+                                    ? 'Drop file here to upload'
+                                    : doc.fileUrl
+                                    ? 'Upload a new file to replace the existing Cloudinary asset'
+                                    : 'Upload file to Cloudinary'
+                                }
+                                style={{
+                                  padding: '2px 8px',
+                                  fontSize: '11px',
+                                  color: isDragOver ? '#1d4ed8' : doc.fileUrl ? '#1e40af' : '#03543f',
+                                  borderColor: isDragOver ? '#3b82f6' : undefined,
+                                  background: isDragOver ? '#dbeafe' : undefined,
+                                  fontWeight: isDragOver ? 700 : undefined,
+                                }}
+                              >
+                                {isDragOver
+                                  ? 'Drop File Here'
+                                  : isCurrentUploading
+                                  ? `Uploading ${currentProgress}%...`
+                                  : doc.fileUrl
+                                  ? 'Replace'
+                                  : 'Upload File'}
+                              </button>
+                              <button
+                                className="legacy-button"
+                                type="button"
+                                onClick={() => openDeleteModal(doc)}
+                                disabled={isCurrentUploading}
+                                title="Delete document & coding record"
+                                style={{ padding: '2px 8px', fontSize: '11px', color: '#9b1c1c' }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                            {rowError && (
+                              <div
+                                style={{
+                                  fontSize: '10px',
+                                  color: '#dc2626',
+                                  maxWidth: '180px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={rowError}
+                              >
+                                {rowError}
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
