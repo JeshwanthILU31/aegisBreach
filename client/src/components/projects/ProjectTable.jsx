@@ -124,7 +124,7 @@ export default function ProjectTable({
                     </button>
                   </td>
                   <td>
-                    <Link className="table-link" to={`/projects/${projectKey}`}>
+                    <Link className="table-link" to={`/projects/${projectKey}/documents`}>
                       {project.name}
                     </Link>
                   </td>

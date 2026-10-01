@@ -266,7 +266,7 @@ export default function Projects() {
                           }}
                         />
                       </button>
-                      <Link to={`/projects/${projectKey}`} className="pinned-item-name">
+                      <Link to={`/projects/${projectKey}/documents`} className="pinned-item-name">
                         {project.name}
                       </Link>
                     </div>

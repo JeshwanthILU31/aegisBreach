@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { Navigate, useLocation, useParams } from 'react-router-dom'
 import AppShell from '../components/layout/AppShell'
 import CodingPage from '../components/coding/CodingPage'
 import DocumentsPage from '../components/documents/DocumentsPage'
@@ -23,13 +23,8 @@ function SectionPlaceholder({ label }) {
 }
 
 function WorkspaceOverview({ project }) {
-  return (
-    <section className="workspace-panel placeholder-panel">
-      <p className="eyebrow">Project workspace</p>
-      <h1>{project.name}</h1>
-      <p className="muted-text">Select Documents or Review from the project navigation.</p>
-    </section>
-  )
+  const projectKey = project?.slug || project?._id || project?.id
+  return <Navigate to={`/projects/${projectKey}/documents`} replace />
 }
 
 export default function ProjectWorkspace() {
@@ -86,7 +81,21 @@ export default function ProjectWorkspace() {
 
   return (
     <AppShell project={project}>
-      {isCodingRoute ? <CodingPage /> : isDocumentRoute && sectionKey !== 'documents' ? <DocumentViewerPlaceholder /> : isReviewRoute ? <DocumentViewerPlaceholder /> : sectionKey === 'documents' ? <DocumentsPage /> : sectionKey === 'review' ? <ReviewPage /> : sectionLabel ? <SectionPlaceholder label={sectionLabel} /> : <WorkspaceOverview project={project} />}
+      {isCodingRoute ? (
+        <CodingPage />
+      ) : isDocumentRoute && sectionKey !== 'documents' ? (
+        <DocumentViewerPlaceholder />
+      ) : isReviewRoute ? (
+        <DocumentViewerPlaceholder />
+      ) : sectionKey === 'documents' ? (
+        <DocumentsPage />
+      ) : sectionKey === 'review' ? (
+        <ReviewPage />
+      ) : sectionLabel ? (
+        <SectionPlaceholder label={sectionLabel} />
+      ) : (
+        <Navigate to={`/projects/${projectId}/documents`} replace />
+      )}
     </AppShell>
   )
 }

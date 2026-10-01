@@ -352,10 +352,10 @@ export default function AdminProjectsPage() {
                       <td style={{ textAlign: 'center', color: '#68767e' }}>{index + 1}</td>
                       <td>
                         <Link
-                          to={`/projects/${project.slug || project._id}`}
+                          to={`/projects/${project.slug || project._id}/documents`}
                           className="table-link"
                           style={{ fontWeight: 600, color: '#105280', textDecoration: 'none' }}
-                          title="Open workspace in review view"
+                          title="Open workspace documents view"
                         >
                           {project.name}
                         </Link>
@@ -423,7 +423,7 @@ export default function AdminProjectsPage() {
                             Delete
                           </button>
                           <Link
-                            to={`/projects/${project.slug || project._id}`}
+                            to={`/projects/${project.slug || project._id}/review`}
                             className="legacy-button"
                             style={{ padding: '2px 8px', fontSize: '11px', textDecoration: 'none' }}
                             title="Go to review workspace"
