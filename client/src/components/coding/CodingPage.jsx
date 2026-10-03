@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import DocumentViewer from './DocumentViewer'
 
 const MIN_CODING_WIDTH = 320
 const MAX_CODING_WIDTH = 650
@@ -1653,98 +1654,16 @@ export default function CodingPage() {
       )
     }
 
-    // PDF files
-    if (format === 'pdf') {
-      return (
-        <iframe
-          key={document.fileUrl}
-          src={`${document.fileUrl}#toolbar=1&navpanes=0`}
-          title={docFileName || 'PDF Document'}
-          className="coding-pdf-frame"
-          onError={() => setViewerError(true)}
-        />
-      )
-    }
-
-    // Image files
-    if (['png', 'jpg', 'jpeg', 'webp', 'tiff', 'bmp', 'gif', 'svg'].includes(format)) {
-      return (
-        <div className="coding-image-container">
-          <img
-            key={document.fileUrl}
-            src={document.fileUrl}
-            alt={docFileName || 'Image Document'}
-            className="coding-image-element"
-            onError={() => setViewerError(true)}
-          />
-        </div>
-      )
-    }
-
-    // Text and CSV files
-    if (['txt', 'csv'].includes(format)) {
-      if (textLoading) {
-        return <div className="coding-viewer-loading">Loading text content...</div>
-      }
-      return (
-        <div className="coding-text-container">
-          <pre className="coding-text-pre">{textContent || '(Empty file)'}</pre>
-        </div>
-      )
-    }
-
-    // Office documents (doc, docx, xls, xlsx, ppt, pptx)
-    if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(format)) {
-      return (
-        <div className="coding-office-container">
-          <iframe
-            key={document.fileUrl}
-            src={`https://docs.google.com/viewer?url=${encodeURIComponent(document.fileUrl)}&embedded=true`}
-            title={docFileName || 'Office Document'}
-            className="coding-office-frame"
-            onError={() => setViewerError(true)}
-          />
-          <div className="coding-office-fallback-bar">
-            <span>
-              <strong>{docFileName}</strong> ({format.toUpperCase()})
-              {document.fileSize ? ` — ${(document.fileSize / 1024).toFixed(1)} KB` : ''}
-            </span>
-            <a
-              href={document.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="legacy-button"
-              download={docFileName}
-            >
-              Download Native File
-            </a>
-          </div>
-        </div>
-      )
-    }
-
-    // Unsupported file formats
+    // Render Custom Enterprise Document Viewer
     return (
-      <div className="coding-unsupported-container">
-        <div className="coding-fallback-card">
-          <div className="fallback-badge">{(format || 'FILE').toUpperCase()}</div>
-          <div className="fallback-filename">{docFileName || 'Document'}</div>
-          <div className="fallback-details">
-            <span>Type: {format ? format.toUpperCase() : 'Unknown'}</span>
-            {document.fileSize && <span>Size: {(document.fileSize / 1024).toFixed(1)} KB</span>}
-          </div>
-          <p className="fallback-message">Preview unavailable for this file format.</p>
-          <a
-            href={document.fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="legacy-button primary-legacy"
-            download={docFileName}
-          >
-            Download Native File
-          </a>
-        </div>
-      </div>
+      <DocumentViewer
+        fileUrl={document.fileUrl}
+        fileName={docFileName}
+        format={format}
+        extractedText={document?.extractedText || textContent}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
     )
   }
 
