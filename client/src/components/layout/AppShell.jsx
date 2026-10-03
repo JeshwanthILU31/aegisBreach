@@ -1,11 +1,11 @@
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 
-export default function AppShell({ children, project }) {
+export default function AppShell({ children, project, hideSidebar = false }) {
   const projectKey = project?.slug || project?._id || project?.id
   return (
-    <div className="app-shell workspace-shell">
-      <Sidebar projectId={projectKey} />
+    <div className={`app-shell workspace-shell ${hideSidebar ? 'hide-sidebar' : ''}`}>
+      {!hideSidebar && <Sidebar projectId={projectKey} />}
       <div className="app-main">
         <TopBar project={project} />
         <div className="app-content">{children}</div>

@@ -1,7 +1,28 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+
+const MIN_CODING_WIDTH = 320
+const MAX_CODING_WIDTH = 650
+const DEFAULT_CODING_WIDTH = 380
+const CODING_STORAGE_KEY = 'aegis.codingLayoutWidth'
+
+function getInitialCodingWidth() {
+  if (typeof window === 'undefined') return DEFAULT_CODING_WIDTH
+  try {
+    const val = localStorage.getItem(CODING_STORAGE_KEY)
+    if (val) {
+      const parsed = parseInt(val, 10)
+      if (!Number.isNaN(parsed)) {
+        return Math.min(MAX_CODING_WIDTH, Math.max(MIN_CODING_WIDTH, parsed))
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_CODING_WIDTH
+}
 
 const defaultCoding = {
   alDesignation: 'Relevant',
@@ -1159,6 +1180,58 @@ export default function CodingPage() {
   const [selectedLayout, setSelectedLayout] = useState('First Level Coding (FLR)')
   const [familyGroupOpen, setFamilyGroupOpen] = useState(false)
 
+  // Coding Layout Panel Horizontal Resizing (Direct pointer capture, no overlay)
+  const [codingWidth, setCodingWidth] = useState(getInitialCodingWidth)
+  const isCodingDraggingRef = useRef(false)
+  const codingStartXRef = useRef(0)
+  const codingStartWidthRef = useRef(DEFAULT_CODING_WIDTH)
+  const [isResizingCoding, setIsResizingCoding] = useState(false)
+
+  const handleCodingResizeDown = (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    isCodingDraggingRef.current = true
+    codingStartXRef.current = e.clientX
+    codingStartWidthRef.current = codingWidth
+    setIsResizingCoding(true)
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleCodingResizeMove = (e) => {
+    if (!isCodingDraggingRef.current) return
+    e.preventDefault()
+    const delta = e.clientX - codingStartXRef.current
+    const newWidth = Math.min(650, Math.max(320, codingStartWidthRef.current - delta))
+    setCodingWidth(newWidth)
+  }
+
+  const handleCodingResizeUp = (e) => {
+    if (!isCodingDraggingRef.current) return
+    e.preventDefault()
+    isCodingDraggingRef.current = false
+    setIsResizingCoding(false)
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      }
+    } catch {
+      // ignore
+    }
+    setCodingWidth((curr) => {
+      try {
+        localStorage.setItem(CODING_STORAGE_KEY, String(curr))
+      } catch {
+        // ignore
+      }
+      return curr
+    })
+  }
+
   // Person modal for Alternate Workflow layout
   const [showAwfPersonForm, setShowAwfPersonForm] = useState(false)
   const [awfPersonDraft, setAwfPersonDraft] = useState(emptyPerson)
@@ -1680,6 +1753,15 @@ export default function CodingPage() {
       {/* Top Document Toolbar */}
       <div className="coding-page-toolbar">
         <div className="coding-document-context">
+          <Link
+            className="coding-back-btn"
+            to={`/projects/${projectId}/documents`}
+            aria-label="Back to documents"
+            title="Back to documents"
+          >
+            ← Back
+          </Link>
+          <span className="coding-context-divider">|</span>
           <Link to={`/projects/${projectId}/documents`}>Documents</Link>
           <span>/</span>
           <strong>{docControlNumber}</strong>
@@ -1734,7 +1816,28 @@ export default function CodingPage() {
         </main>
 
         {/* Coding Layout Panel on the Right */}
-        <aside className="coding-panel">
+        <aside
+          className="coding-panel"
+          style={{
+            '--coding-panel-width': `${codingWidth}px`,
+            width: `${codingWidth}px`,
+            minWidth: `${codingWidth}px`,
+            maxWidth: `${codingWidth}px`,
+            flexBasis: `${codingWidth}px`,
+          }}
+        >
+          <div
+            className={`coding-resize-handle ${isResizingCoding ? 'is-resizing' : ''}`}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize coding layout"
+            title="Drag to resize coding layout"
+            onPointerDown={handleCodingResizeDown}
+            onPointerMove={handleCodingResizeMove}
+            onPointerUp={handleCodingResizeUp}
+            onPointerCancel={handleCodingResizeUp}
+          />
+
           {/* Header */}
           <div className="coding-panel-header">
             <div className="coding-panel-header-top">

@@ -80,7 +80,7 @@ export default function ProjectWorkspace() {
   }
 
   return (
-    <AppShell project={project}>
+    <AppShell project={project} hideSidebar={isCodingRoute}>
       {isCodingRoute ? (
         <CodingPage />
       ) : isDocumentRoute && sectionKey !== 'documents' ? (
