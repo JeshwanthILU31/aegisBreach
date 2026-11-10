@@ -1,4 +1,5 @@
 import { Link, Route, Routes } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { Login, Register, ProjectWorkspace, Projects } from './pages'
 import AdminProjectsPage from './components/admin/AdminProjectsPage'
 import AdminBatchesPage from './components/admin/AdminBatchesPage'
@@ -93,6 +94,7 @@ function App() {
         />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <Analytics />
     </>
   )
 }
